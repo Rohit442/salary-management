@@ -31,7 +31,8 @@ public class AuthRequestValidator {
 
     public String allowedMethod(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        if (path.equals("/api/employees")) return "GET";
+        if (path.equals("/api/employees")) return "GET, POST";
+        if (path.matches("/api/employees/[^/]+/(details|status)")) return "PUT";
         return path.matches("/api/employees/[^/]+") ? "GET" : METHODS.get(path);
     }
 

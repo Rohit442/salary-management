@@ -58,7 +58,10 @@ public class ApiResponseWriter {
         if (exception.status().is5xxServerError() && exception.getCause() != null) {
             LOGGER.error("API dependency failed; requestId={}", prepare(request, response), exception.getCause());
         }
-        error(request, response, exception.status().value(), exception.code(), exception.getMessage(), exception.fieldErrors());
+        if (exception instanceof com.acme.salarymanagement.exception.VersionConflictException conflict) {
+            json(request,response,exception.status().value(),new ApiError(exception.code(),exception.getMessage(),
+                    prepare(request,response),exception.fieldErrors(),conflict.details()));
+        } else error(request, response, exception.status().value(), exception.code(), exception.getMessage(), exception.fieldErrors());
     }
 
     public void unexpected(HttpServletRequest request, HttpServletResponse response, Exception exception) throws IOException {

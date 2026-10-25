@@ -18,6 +18,8 @@ public class SqlUtility {
         return jdbc.query(sql, mapper, parameters);
     }
 
+    public int update(String sql, Object... parameters) { return jdbc.update(sql, parameters); }
+
     public <T> T queryOne(String sql, RowMapper<T> mapper, Object... parameters) {
         return jdbc.queryForObject(sql, mapper, parameters);
     }

@@ -1,6 +1,9 @@
 package com.acme.salarymanagement.impl;
 
 import com.acme.salarymanagement.bean.ApiFieldError;
+import com.acme.salarymanagement.bean.CreateEmployeeRequest;
+import com.acme.salarymanagement.bean.EmployeeDetailsRequest;
+import com.acme.salarymanagement.exception.VersionConflictException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -75,6 +78,76 @@ public class EmployeeServiceImpl implements EmployeeService {
         } catch (DataAccessException exception) { throw unavailable(exception); }
     }
 
+
+    @Override
+    @Transactional
+    public EmployeeResponse create(CreateEmployeeRequest request,String actorEmail) {
+        try {
+            var actor=sql.queryOne("SELECT id,display_name FROM hr_user WHERE work_email=? AND enabled=true AND role='HR'",
+                    (row,index)->new Object[]{row.getLong("id"),row.getString("display_name")},actorEmail);
+            var timestamp=OffsetDateTime.ofInstant(clock.instant(),ZoneOffset.UTC);
+            sql.update("""
+                    INSERT INTO employee(employee_id,full_name,work_email,country_code,department,job_title,job_level,
+                    employment_status,annual_base_salary,currency_code,joining_date,last_employment_date,
+                    initial_annual_base_salary,initial_salary_effective_from,salary_effective_from,version,
+                    created_at,updated_at,created_by_fk,created_by_display_name)
+                    VALUES(?,?,?,?,?,?,?,'ACTIVE',?,?,?,NULL,?,?,?,0,?,?,?,?)
+                    """,request.employeeId(),request.fullName(),request.workEmail(),request.countryCode(),request.department(),
+                    request.jobTitle(),request.jobLevel(),new BigDecimal(request.annualBaseSalary()),request.currency(),
+                    request.joiningDate(),new BigDecimal(request.annualBaseSalary()),request.initialSalaryEffectiveFrom(),
+                    request.initialSalaryEffectiveFrom(),timestamp,timestamp,actor[0],actor[1]);
+            return details(request.employeeId());
+        } catch (DuplicateKeyException exception) { throw duplicate(exception); }
+        catch (DataAccessException exception) { throw unavailable(exception); }
+    }
+
+    @Override
+    @Transactional
+    public EmployeeResponse updateDetails(String id,EmployeeDetailsRequest request) {
+        try {
+            lockAndCheckVersion(id,request.version());
+            EmployeeResponse current=details(id);
+            if (request.joiningDate().isAfter(current.initialSalaryEffectiveFrom())
+                    || (request.lastEmploymentDate()!=null && request.lastEmploymentDate().isBefore(current.salaryEffectiveFrom()))) {
+                throw new ApiRequestException(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR","Check the employment dates.",
+                        List.of(new ApiFieldError("joiningDate","INVALID_DATE_ORDER","Employment dates must cover all recorded salary effective dates.")));
+            }
+            boolean unchanged=request.fullName().equals(current.fullName()) && request.workEmail().equals(current.workEmail())
+                    && request.countryCode().equals(current.countryCode()) && request.department().equals(current.department())
+                    && request.jobTitle().equals(current.jobTitle()) && request.jobLevel().equals(current.jobLevel())
+                    && request.joiningDate().equals(current.joiningDate()) && Objects.equals(request.lastEmploymentDate(),current.lastEmploymentDate());
+            if (!unchanged) sql.update("""
+                    UPDATE employee SET full_name=?,work_email=?,country_code=?,department=?,job_title=?,job_level=?,
+                    joining_date=?,last_employment_date=?,version=version+1,updated_at=? WHERE employee_id=? AND version=?
+                    """,request.fullName(),request.workEmail(),request.countryCode(),request.department(),request.jobTitle(),
+                    request.jobLevel(),request.joiningDate(),request.lastEmploymentDate(),
+                    OffsetDateTime.ofInstant(clock.instant(),ZoneOffset.UTC),id,request.version());
+            return details(id);
+        } catch (DuplicateKeyException exception) { throw duplicate(exception); }
+        catch (DataAccessException exception) { throw unavailable(exception); }
+    }
+
+    @Override
+    @Transactional
+    public EmployeeResponse inactivate(String id,long version) {
+        try {
+            lockAndCheckVersion(id,version);
+            sql.update("UPDATE employee SET employment_status='INACTIVE',version=version+1,updated_at=? WHERE employee_id=? AND version=? AND employment_status<>'INACTIVE'",
+                    OffsetDateTime.ofInstant(clock.instant(),ZoneOffset.UTC),id,version);
+            return details(id);
+        } catch (DataAccessException exception) { throw unavailable(exception); }
+    }
+    private void lockAndCheckVersion(String id,long expected) {
+        var versions=sql.query("SELECT version FROM employee WHERE employee_id=? FOR UPDATE",(row,index)->row.getLong(1),id);
+        if (versions.isEmpty()) throw new ApiRequestException(HttpStatus.NOT_FOUND,"EMPLOYEE_NOT_FOUND","Employee was not found.",List.of());
+        if (versions.getFirst()!=expected) throw new VersionConflictException(expected,versions.getFirst());
+    }
+    private ApiRequestException duplicate(DuplicateKeyException exception) {
+        boolean identity=exception.getMostSpecificCause().getMessage().split(";",2)[0].toUpperCase(Locale.ROOT).contains("(EMPLOYEE_ID");
+        String field=identity?"employeeId":"workEmail";
+        return new ApiRequestException(HttpStatus.CONFLICT,identity?"EMPLOYEE_ID_EXISTS":"WORK_EMAIL_EXISTS","This "+field+" is already in use.",
+                List.of(new ApiFieldError(field,"NOT_UNIQUE","This value must be unique.")));
+    }
 
     private EmployeeResponse employee(ResultSet row, int index) throws SQLException {
         return new EmployeeResponse(row.getString("employee_id"), row.getString("full_name"), row.getString("work_email"),

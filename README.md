@@ -2,9 +2,9 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, and all four JSON authentication APIs. Added compensation reporting and reference data, employee directory/detail reads. Remaining business APIs, Non-demo HR provisioning, CI and deployment remain pending.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, and all four JSON authentication APIs. Added compensation reporting and reference data, employee directory/detail reads, validated employee creation and versioned details/status writes. Remaining business APIs, Non-demo HR provisioning, CI and deployment remain pending.
 
-The latest local Maven `clean verify` passed **127 tests with zero failures/errors/skips** and packaged the backend. This includes all 29 original auth contract cases and eight real HTTP cases. Test databases and random-port servers are isolated from your running application on port 8080.
+The latest local Maven `clean verify` passed **143 tests with zero failures/errors/skips** and packaged the backend. This includes all 29 original auth contract cases and eight real HTTP cases. Test databases and random-port servers are isolated from your running application on port 8080.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 

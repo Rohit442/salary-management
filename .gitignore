@@ -9,3 +9,8 @@ blob-report/
 .env
 .env.*
 !.env.example
+
+# Local H2 databases
+*.mv.db
+*.trace.db
+*.lock.db

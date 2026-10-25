@@ -48,16 +48,16 @@ The selected frontend is **AngularJS**, matching the assessment's Java-specific 
 
 ## Database decision
 
-Use **Oracle Database**, with migrations and database-specific queries written in Oracle SQL. Use Oracle Database Free for local development and the assessment environment where its resource limits are sufficient. Oracle SQL Developer or DBeaver may be used as a database client; neither replaces the database server.
+Use **H2** with **Liquibase** for schema migrations and seed data. Local runs use a persistent file; integration tests use isolated in-memory or temporary file databases. No separately installed database server is needed.
 
-- Connect Spring Data JPA/Hibernate through Oracle's JDBC driver. Select compatible Spring Boot, JDBC, Oracle Database, and Flyway versions together before creating the backend.
-- Represent money with Java `BigDecimal` and fixed-precision Oracle `NUMBER` columns. Select and document precision/scale in the schema; continue enforcing each currency's accepted fractional precision in validation.
-- Enforce identity uniqueness and relationships in Oracle. Ensure the work-email uniqueness rule remains case-insensitive after trimming.
-- Keep the salary record and history entry in one transaction, and use optimistic concurrency control for conflicting edits.
-- Write Oracle-compatible schema migrations, pagination, seed statements, and reporting queries. Verify decimal aggregation, median, rounding, and timestamps against the reporting rules.
-- Run database integration tests against Oracle rather than treating another database's behavior as proof of Oracle compatibility. Unit tests for pure validation and calculation remain database-independent.
+- Use Spring-managed JDBC/JPA connections and transactions.
+- Represent money with Java `BigDecimal` and fixed-precision `DECIMAL(19,4)` columns; validate currency precision separately.
+- Enforce identity uniqueness, normalized work-email uniqueness, relationships, and positive amounts in the schema.
+- Keep salary and history writes in one transaction, with optimistic concurrency checks.
+- Verify H2 pagination, median, decimal aggregation, rounding, dates, and concurrent writes against deterministic fixtures.
+- Keep the 10,000-employee demo seed explicitly selected and separate from fast test fixtures; ordinary restarts reuse persisted data.
 
-See [Oracle Database Setup and Decision](database-oracle.md) for local tooling and implementation guidance.
+See [H2 database setup](database-h2.md).
 
 ## Verification scenarios
 

@@ -12,7 +12,7 @@ These instructions reflect the user's explicit request for precise communication
 - When correcting a misleading statement, acknowledge it directly and fix affected documentation rather than adding another promise.
 - Follow the current requirements and user decisions. Do not restore superseded technology choices or expand excluded product scope.
 - Apply red–green–refactor to core business behavior and bug fixes: observe the expected test failure before implementing, make it pass, then refactor with tests green. Do not describe tests written afterward as TDD.
-- Test observable behavior at the lowest useful level. Verify Oracle-specific transactions, constraints, aggregates, and concurrency against Oracle rather than mocks or a substitute database.
+- Test observable behavior at the lowest useful level. Verify database transactions, constraints, aggregates, and concurrency against H2 with Liquibase migrations rather than mocks. Keep test databases isolated from the persistent local database.
 - Keep units focused and dependencies explicit. Use constructor injection, avoid speculative abstractions, and do not introduce distributed infrastructure without a demonstrated requirement.
 - Keep project artifacts focused on adopted engineering decisions, rationale, sources, and actual verification. Omit the conversational research process; retain relevant implementation-related AI-use evidence required by the assessment.
 

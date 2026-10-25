@@ -311,4 +311,4 @@ curl --silent --show-error --fail-with-body --get \
 
 ## 4. Required verification
 
-Use [TDD and Oracle integration checks](testing-strategy.md) for amount/reason/date validation, whole-month raises, same-month multiple changes, baseline coverage, effective-date replay mismatches, unchanged salary, atomic history writes, all version races, stable actor snapshots, replay after later changes, mismatched keys, concurrent duplicate requests, access revocation, pagination and preservation of inactive history. Verify both curl commands against the running backend.
+Use [TDD and H2 integration checks](testing-strategy.md) for amount/reason/date validation, whole-month raises, same-month multiple changes, baseline coverage, effective-date replay mismatches, unchanged salary, atomic history writes, all version races, stable actor snapshots, replay after later changes, mismatched keys, concurrent duplicate requests, access revocation, pagination and preservation of inactive history. Verify both curl commands against the running backend.

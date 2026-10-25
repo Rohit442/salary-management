@@ -9,17 +9,17 @@ This log records adopted engineering decisions, their rationale, and supporting 
 | Manage annual base salaries and monthly base-pay estimates | Cover compensation maintenance and joining/leaving calculations |
 | Keep monetary reports separated by currency | Avoid unsupported exchange-rate assumptions and misleading totals |
 | Use Java and Spring Boot | Match the user's chosen ecosystem |
-| Bootstrap with Java 21 and Spring Boot 3.5.16 | Pin the backend baseline in the Maven POM; use Boot dependency management for compatible Spring, Oracle, Flyway, and test versions |
-| Reuse the supplied Spring project bootstrap and Maven wrapper | Retain the existing POM and `com.acme.salarymanagement` package; supply Oracle credentials through environment variables and use a real-database startup smoke test |
+| Bootstrap with Java 21 and Spring Boot 3.5.16 | Pin the backend baseline in the Maven POM; use Boot dependency management for compatible Spring, H2, Liquibase, and test versions |
+| Reuse the supplied Spring project bootstrap and Maven wrapper | Retain the existing POM and `com.acme.salarymanagement` package; use persistent H2 locally and isolated H2 databases for tests |
 | Use AngularJS | Follow the assignment's Java-specific frontend wording |
-| Use Oracle Database | User explicitly chose Oracle after comparing database options |
+| Use persistent H2 and Liquibase | Simplify clone/run, retain data across backend restarts, and apply schema/seed changes once |
 | Build a modular monolith | Keep transactions, deployment, and internal responsibilities manageable |
 | Use pre-provisioned HR accounts and server sessions | Support named HR identities and server-managed sessions |
 | Save salary and audit history atomically with version checks | Preserve history consistency and prevent silent overwrites |
 | Retain eight main screens | Cover employee maintenance, salary history, and compensation reporting |
 | Use TDD for core behavior and bug fixes | Drive design with observable examples and fast feedback; refactor safely |
 | Use focused units and constructor injection | Keep business behavior independently testable and dependencies explicit |
-| Verify database behavior against Oracle | Validate actual constraints, transactions, queries, and conflicting writes |
+| Verify database behavior against H2 | Validate actual constraints, transactions, queries, and conflicting writes |
 | Automate builds and tests in CI | Make verification reproducible and expose regressions early |
 | Measure before scaling | Use query plans, workload measurements, and operational signals to justify optimization |
 | Define four authentication endpoints with session cookies and explicit CSRF retrieval | Reuse Spring Security authentication/logout handling with predictable JSON responses for AngularJS |
@@ -33,7 +33,7 @@ This log records adopted engineering decisions, their rationale, and supporting 
 
 AngularJS is a legacy choice: [official support ended in January 2022](https://github.com/angular/angular.js/security/policy). The choice follows the assessment wording. Record any approved framework change here.
 
-The Oracle decision supersedes the earlier PostgreSQL choice.
+H2 supersedes Oracle and PostgreSQL; Liquibase supersedes Flyway. The database runs inside the backend process and persists to a file.
 
 ## Engineering practice and evidence
 
@@ -47,12 +47,20 @@ Reference guidance: [TDD](https://www.martinfowler.com/bliki/TestDrivenDevelopme
 
 | Work | AI contribution | Review and evidence |
 |---|---|---|
-| Requirements | Drafted and refined scope, exclusions, and correctness rules | User supplied the baseline, approved refinements, and selected Oracle; saved in [requirements](requirements.md) and [rules](requirements-rules.md) |
+| Requirements | Drafted and refined scope, exclusions, and correctness rules | User supplied the baseline, approved refinements, and selected H2; saved in [requirements](requirements.md) and [rules](requirements-rules.md) |
 | UI planning and design | Converted supplied flows into FigJam diagrams; created eight editable Figma screens and supporting states | Main screens and supporting states reviewed; effective dates and monthly estimate designs updated, with manual layout/recovery repairs recorded in the [Figma handoff](design/figma-ui.md) |
 | Design standards | Reviewed the supplied standards and produced an enhanced PDF | Generated PDF pages visually inspected; [saved standards](../output/pdf/salary-management-design-standards-v2.pdf) |
 | API contracts | Added employment dates, salary effective dates/baseline, and the monthly base-pay endpoint | Validated JSON examples, shell/heredoc syntax, local links, endpoint/curl coverage, and independently checked example arithmetic; [API index](api-conventions.md) |
 | Technical design | Proposed architecture, data model, transaction flow, and verification approach | Checked local links and the presence of three Mermaid blocks; [technical design](technical-design.md) |
 
-Representative requests were “apply refinements,” “making the UI screens on figma,” and “Switch to Oracle SQL.” Retain relevant implementation prompts and verification evidence as development proceeds.
+Representative requests were “apply refinements,” “making the UI screens on figma,” and “use H2, and use liquibase to seed tables.” Retain relevant implementation prompts and verification evidence as development proceeds.
 
 Add observed implementation results and significant decision changes to this log as work occurs.
+
+## Verified sample backend — 25 October 2026
+
+- Added persistent H2, Liquibase table/seed changesets, a generic Spring JDBC SQL utility, and the implemented `GET /api/sample` route.
+- Test-first observation: `returnsGreetingReadFromSeededTable` failed with H2 `Table SAMPLE_MESSAGE not found` before adding the table, seed, and endpoint implementation.
+- Maven `verify` passed: three tests, zero failures/errors. Tests verify the seeded API response, unauthenticated rejection, and file persistence after closing/reopening the application with no repeated seed or overwritten edits.
+- Packaged application HTTP check returned 200 with `{"id":1,"message":"hello Rohit"}` using development authentication; the unauthenticated JSON request returned 401.
+- Verification used IntelliJ's bundled JDK 25 with Java 21 compilation target. Tests use isolated databases; the live sample used the default persistent home-directory H2 file.

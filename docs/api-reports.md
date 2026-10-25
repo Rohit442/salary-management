@@ -35,7 +35,7 @@ No `q`, employment-status override, date range, sort, page or size parameter is 
 
 Each currency summary requires `currency`, `employeeCount`, `totalAnnualBaseSalary`, `averageAnnualBaseSalary`, and `medianAnnualBaseSalary`. Each group requires `dimensions`, `employeeCount` and those three amount fields. `dimensions` contains exactly the effective group keys; the country dimension contains a country code, not a label. Counts are integers; all amounts are decimal strings rounded once to that currency's precision using HALF_UP. Keep full decimal precision for calculations. Aggregate totals may exceed the per-employee input cap and must not be rounded into that cap or overflow an employee-sized storage type.
 
-Each report's counts, currency summaries and groups must use one consistent Oracle snapshot. Calculate overall metrics from matching employee rows; never average group averages or medians. When no additional dimension is requested, `groupBy` is `["currency"]`; groups and currency summaries describe the same per-currency populations in their respective shapes.
+Each report's counts, currency summaries and groups must use one consistent H2 snapshot. Calculate overall metrics from matching employee rows; never average group averages or medians. When no additional dimension is requested, `groupBy` is `["currency"]`; groups and currency summaries describe the same per-currency populations in their respective shapes.
 
 Sort `currencySummaries` by currency code ascending. Sort `groups` by currency ascending, then the requested non-currency dimensions in canonical order using canonical value ordering. Sort/deduplicate filter arrays canonically before echoing them. The frontend must use `dimensions.currency` or summary `currency` when displaying money and must not directly compare currencies.
 
@@ -165,4 +165,4 @@ On query/database failure return the shared 500/503 envelope, not 200 with empty
 
 ## 2. Required verification
 
-Test every grouping combination, shared filter semantics, independent currencies, inactive exclusion, odd/even medians, display rounding, large aggregate totals, consistent snapshots and empty/error distinctions against Oracle using [independently calculated fixtures](testing-strategy.md). Check group counts sum to currency summaries and all currency counts sum to `totalEmployees`; do not require rounded group averages/medians to sum. Verify the curl example against the running backend.
+Test every grouping combination, shared filter semantics, independent currencies, inactive exclusion, odd/even medians, display rounding, large aggregate totals, consistent snapshots and empty/error distinctions against H2 using [independently calculated fixtures](testing-strategy.md). Check group counts sum to currency summaries and all currency counts sum to `totalEmployees`; do not require rounded group averages/medians to sum. Verify the curl example against the running backend.

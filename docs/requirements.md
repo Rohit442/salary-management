@@ -21,9 +21,9 @@ Replace fragmented Excel spreadsheets with a web application that lets HR mainta
 
 ## Technical and Delivery Requirements
 
-- **Stack:** Java with Spring Boot, Spring Web, Spring Data JPA, and Spring Security; AngularJS with a suitable component library; Oracle Database with versioned schema migrations written in Oracle SQL. Document framework versions and the AngularJS choice separately.
-- **Data:** A repeatable seed script creating 10,000 fictional employees across countries, currencies, departments, and job levels.
-- **Engineering and verification:** Use TDD for core business behavior and bug fixes, with red–green–refactor cycles. Maintain focused, testable code; fast, deterministic unit tests; Oracle integration tests for persistence, access control, and concurrency; and Playwright tests for essential workflows. Automate build/test checks and record measured performance.
+- **Stack:** Java with Spring Boot, Spring Web, Spring Data JPA, and Spring Security; AngularJS with a suitable component library; H2 with versioned Liquibase schema and seed changelogs. Document framework versions and the AngularJS choice separately.
+- **Data:** An explicitly selected, repeatable Liquibase seed creating 10,000 fictional employees across countries, currencies, departments, and job levels.
+- **Engineering and verification:** Use TDD for core business behavior and bug fixes, with red–green–refactor cycles. Maintain focused, testable code; fast, deterministic unit tests; H2 integration tests for persistence, access control, and concurrency; and Playwright tests for essential workflows. Automate build/test checks and record measured performance.
 - **Delivery:** A functional deployment, setup and test instructions, a video demo, and a Git repository with incremental commits. Commit this document before application implementation and include design/trade-off notes and evidence of intentional AI use and verification. Submit the repository link by replying to the assessment email.
 
 ## Out of scope

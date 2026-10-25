@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-sample-message
+      author: salary-management
+      changes:
+        - createTable:
+            tableName: sample_message
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: message
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 002-seed-sample-message
+      author: salary-management
+      changes:
+        - insert:
+            tableName: sample_message
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: message
+                  value: hello Rohit

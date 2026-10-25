@@ -2,13 +2,13 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. Business APIs, database migrations/seeding, Oracle provisioning, application verification, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend now includes persistent H2, Liquibase table creation/seeding, and an authenticated `GET /api/sample` returning a database-backed greeting. Salary-management APIs, the employee schema and 10,000-record dataset, named HR authentication, CI, and deployment are pending. The current Playwright starter verifies browser setup.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
 ## Planned application stack
 
-Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **Oracle Database**, using versioned Oracle SQL migrations. Local database development will use Oracle Database Free. See the [product requirements](docs/requirements.md) and [Oracle database setup guidance](docs/database-oracle.md).
+Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **H2**, using versioned Liquibase changelogs. Local runs retain data in a file; tests use isolated databases. See the [product requirements](docs/requirements.md) and [H2 database setup guidance](docs/database-h2.md).
 
 ## Backend setup in IntelliJ IDEA
 
@@ -16,22 +16,30 @@ Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **Oracle
 2. In **File → Project Structure → Project → SDK**, select **Download JDK** and choose Java 21, or select an existing JDK 21 installation.
 3. Set the Maven importer and runner to use the project JDK, then reload the Maven project. IntelliJ's bundled Maven can resolve the dependencies.
 
-The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, Oracle JDBC, Flyway with Oracle support, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
+The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, H2 JDBC, Liquibase, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
 
 JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/sdk.html).
 
-### Oracle configuration and backend commands
+### H2 configuration and backend commands
 
-Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` in the IntelliJ run configuration or shell environment. For a local Oracle Free instance, the JDBC URL typically has the form `jdbc:oracle:thin:@localhost:1521/FREEPDB1`; use the actual service and application-schema credentials for your instance. Keep passwords out of source files.
+No database installation is needed. The default H2 file lives at `~/.acme-salary-management/salary-management.mv.db` and survives backend restarts. Optional `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` override the defaults. Remove old Oracle overrides before running.
 
-The configuration uses Flyway for migrations and Hibernate schema validation. The startup smoke test connects to the configured Oracle database.
+Liquibase creates `sample_message` and seeds `hello Rohit` once. Hibernate validates the schema. Tests use separate databases.
+
+After startup, read the sample using the generated development password from the console (curl prompts for it):
+
+```sh
+curl --user user --header 'Accept: application/json' http://localhost:8080/api/sample
+```
+
+Response: `{"id":1,"message":"hello Rohit"}`. See [H2 setup](docs/database-h2.md) for persistence and migration details.
 
 From `backend/`, use the supplied Maven wrapper:
 
 | Command | Purpose |
 |---|---|
 | `./mvnw clean verify` | Compile, run tests, and package the application |
-| `./mvnw spring-boot:run` | Start the backend with the configured Oracle connection |
+| `./mvnw spring-boot:run` | Start the backend with the configured H2 connection |
 
 On Windows, use `mvnw.cmd` in place of `./mvnw`.
 
@@ -47,8 +55,8 @@ On Windows, use `mvnw.cmd` in place of `./mvnw`.
 - [Monthly base-pay API contract](docs/api-base-pay.md): effective salary selection, whole-month raises, and joining/leaving proration
 - [Reference-data API contract](docs/api-reference-data.md): backend-owned form/filter options and currency precision
 - [Engineering decisions and AI usage](docs/engineering-notes.md)
-- [Testing strategy and verification plan](docs/testing-strategy.md), including TDD, Oracle checks, CI and measurement evidence
-- [Oracle database setup and decision](docs/database-oracle.md)
+- [Testing strategy and verification plan](docs/testing-strategy.md), including TDD, H2 checks, CI and measurement evidence
+- [H2 database setup and decision](docs/database-h2.md)
 - [Figma screens and design handoff](docs/design/figma-ui.md)
 
 ## Requirements

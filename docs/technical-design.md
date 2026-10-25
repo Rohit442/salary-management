@@ -4,7 +4,7 @@ This design defines the implementation of the [agreed requirements](requirements
 
 ## 1. Architecture and boundaries
 
-Use a modular monolith: one Spring Boot application with an AngularJS frontend and an Oracle relational database. Deploy frontend assets and API under the same origin. This keeps session authentication and deployment straightforward for the assessment while preserving clear internal module boundaries.
+Use a modular monolith: one Spring Boot application with an AngularJS frontend and an H2 relational database. Deploy frontend assets and API under the same origin. This keeps session authentication and deployment straightforward for the assessment while preserving clear internal module boundaries.
 
 ```mermaid
 flowchart LR
@@ -14,34 +14,34 @@ flowchart LR
         security["Spring Security: session, HR access, CSRF"]
         api["Spring Web: controllers and DTO validation"]
         services["Employee, salary and reporting services"]
-        data["JPA repositories and Oracle reporting queries"]
+        data["JPA repositories and H2 reporting queries"]
         ui -->|"Same-origin API requests"| security
         security --> api
         api --> services
         services --> data
     end
     subgraph database["Private database boundary"]
-        oracle[("Oracle Database")]
+        database[("H2")]
     end
     hr -->|"HTTPS"| ui
     data -->|"JDBC"| oracle
-    migration["Versioned Flyway migrations"] --> oracle
-    seed["Explicit fictional-data seed command"] --> oracle
+    migration["Versioned Liquibase migrations"] --> database
+    seed["Explicit fictional-data seed command"] --> database
 ```
 
-The browser never connects directly to Oracle. Backend access checks are authoritative.
+The browser never connects directly to H2. Backend access checks are authoritative.
 
 | Area | Decision |
 |---|---|
 | Runtime and build | JDK 21 and Maven Wrapper |
 | Backend | Spring Boot, Spring Web, Spring Data JPA, Spring Security, Bean Validation |
 | Frontend | AngularJS, with a compatible component library and locally built assets |
-| Database | Oracle Database; Oracle Database Free for local development |
-| Migrations | Flyway with Oracle support; Hibernate validates the resulting schema |
+| Database | H2; persistent H2 for local development |
+| Migrations | Liquibase; Hibernate validates the resulting schema |
 | Authentication | Pre-provisioned named HR accounts and server-side sessions |
-| Tests | Unit tests, Spring integration tests against Oracle, and Playwright workflows |
+| Tests | Unit tests, Spring integration tests against H2, and Playwright workflows |
 
-Pin the Spring Boot, JDBC driver, Flyway modules, Oracle container image, frontend packages, and component library versions during project bootstrap and record them in build/lock files. Use compatible stable releases rather than independently selecting the newest version of each dependency. Select the component library and exact release versions during bootstrap.
+Pin the Spring Boot, JDBC driver, Liquibase, frontend packages, and component library versions during project bootstrap and record them in build/lock files. Use compatible stable releases rather than independently selecting the newest version of each dependency. Select the component library and exact release versions during bootstrap.
 
 AngularJS is the assignment-driven frontend choice and must not be silently replaced with modern Angular. Its support status and rationale are recorded in the [engineering decision log](engineering-notes.md). The Java backend remains independent of the frontend framework.
 
@@ -135,22 +135,22 @@ erDiagram
     }
 ```
 
-Logical types above are illustrative; migrations define exact Oracle types, lengths, precision, and indexes.
+Logical types above are illustrative; migrations define exact H2 types, lengths, precision, and indexes.
 
 - Use an internal numeric primary key separately from the visible, immutable employee ID.
-- Trim employee IDs and emails. Enforce work-email uniqueness using a normalized value or an Oracle function-based unique index on `LOWER(TRIM(work_email))`; application checks alone are insufficient. Uniqueness includes inactive employees.
-- Store current and historical salary amounts as Oracle `NUMBER(19,4)` and map them to Java `BigDecimal`. The [employee API contract](api-employees.md) defines input range and currency-specific fractional validation; the initial migration must enforce compatible storage limits. Do not use floating point for money.
+- Trim employee IDs and emails. Enforce work-email uniqueness using a persisted normalized value with a unique constraint; application checks alone are insufficient. Uniqueness includes inactive employees.
+- Store current and historical salary amounts as H2 `DECIMAL(19,4)` and map them to Java `BigDecimal`. The [employee API contract](api-employees.md) defines input range and currency-specific fractional validation; the initial migration must enforce compatible storage limits. Do not use floating point for money.
 - Require positive, non-null current and historical amounts. Validate supported currency, country, department, and job-level values against the configured reference data. Currency precision comes from `CURRENCY`.
 - Restrict employment status to `ACTIVE` or `INACTIVE`. Preserve employee records. Initial creation sets active status.
 - Map `version` to JPA optimistic locking. Detail edits, salary updates, and inactive-status updates all participate in version checks on the same employee.
-- Generate audit timestamps on the server, store unambiguous instants with an appropriate Oracle timestamp type, and return ISO-8601 timestamps with an offset. Display the timezone explicitly.
+- Generate audit timestamps on the server, store unambiguous instants with an appropriate H2 timestamp type, and return ISO-8601 timestamps with an offset. Display the timezone explicitly.
 - Store the actor's stable HR user ID and display-name snapshot at change time, preserving immutable history/replay after a rename. HR accounts are disabled rather than deleted when referenced by history.
 - Preserve immutable salary history. Employee creation stores the immutable initial amount/effective date and creation actor snapshot alongside the current salary; history entries record subsequent changes and their effective dates.
 - Enforce a unique `(actor_fk, request_id)` key on successful salary-change requests. Here `request_id` stores the client operation's `Idempotency-Key`, not the HTTP tracing ID. Persist the fingerprint, original change fields, actor snapshot and resulting version for the lifetime of retained history.
 
-Store employment and salary dates as Oracle `DATE` values at midnight, mapped to Java `LocalDate`; validate them as calendar dates. Use the shared employee version for date edits and salary writes. Update current amount/effective date, append history, and persist replay metadata atomically. Salary changes advance effective dates and may apply to the current or a past month. Their month uses its latest effective rate throughout; joining/leaving alone prorates days. Keep current annual reports based on active status and the latest salary.
+Store employment and salary dates as H2 `DATE` values, mapped to Java `LocalDate`; validate them as calendar dates. Use the shared employee version for date edits and salary writes. Update current amount/effective date, append history, and persist replay metadata atomically. Salary changes advance effective dates and may apply to the current or a past month. Their month uses its latest effective rate throughout; joining/leaving alone prorates days. Keep current annual reports based on active status and the latest salary.
 
-Monthly estimates select the applicable salary and employment dates in one consistent Oracle read snapshot. Use the immutable baseline plus changes, reject incomplete coverage, and return the employee version used. Calculate with exact rational/decimal arithmetic and round once at the response boundary. See [monthly estimates](api-base-pay.md).
+Monthly estimates select the applicable salary and employment dates in one consistent H2 read snapshot. Use the immutable baseline plus changes, reject incomplete coverage, and return the employee version used. Calculate with exact rational/decimal arithmetic and round once at the response boundary. See [monthly estimates](api-base-pay.md).
 
 ## 4. Authentication and authorization
 
@@ -174,7 +174,7 @@ sequenceDiagram
     participant UI as AngularJS UI
     participant SEC as Spring Security
     participant SVC as Salary service
-    participant DB as Oracle Database
+    participant DB as H2
 
     HR->>UI: Review salary and submit a reason
     UI->>SEC: Send amount, reason, version, operation key and CSRF token
@@ -220,13 +220,13 @@ Use server-side pagination with a default page size of 25 and a maximum of 100. 
 
 Apply AND semantics across filter categories and OR semantics within a multi-select category. Bind filter values as parameters. Whitelist sortable and groupable columns; never concatenate user-supplied SQL identifiers. Fetch only directory projections instead of loading every employee and their history.
 
-Calculate report groups in Oracle using `COUNT`, `SUM`, `AVG`, and `MEDIAN` on active employees. Always include currency in the grouping key, including when the user selects an additional grouping dimension. Oracle's numeric [MEDIAN function](https://docs.oracle.com/en/database/oracle/oracle-database/26/sqlrf/MEDIAN.html) provides the required odd/even middle-value behavior.
+Calculate report groups in H2 using `COUNT`, `SUM`, `AVG`, and `MEDIAN` on active employees. Always include currency in the grouping key, including when the user selects an additional grouping dimension. Verify H2 median results against independently calculated odd/even fixtures.
 
 Read aggregate values as decimal types. Round returned display amounts once, using the currency's fraction digits and HALF_UP. Calculate overall statistics from matching employee rows rather than averaging group averages or medians. A count across currencies is valid; a monetary total across currencies is not. Return no monetary groups for no matches, count zero, and unavailable average/median rather than fabricated zeros.
 
 Return each report's summary and groups from one consistent database snapshot, preferably one aggregate statement with grouping sets, so a concurrent salary update cannot produce a mismatched total and breakdown. The [report contract](api-reports.md) specifies grouping combinations and response schemas.
 
-Index unique identifiers and normalized work email. Add an index supporting history lookup by employee, timestamp, and change ID. Evaluate reporting/filter indexes against the seeded workload and actual Oracle query plans rather than indexing every filter combination. Measure the directory count query as well as fetching its page. No cache or search service is required initially.
+Index unique identifiers and normalized work email. Add an index supporting history lookup by employee, timestamp, and change ID. Evaluate reporting/filter indexes against the seeded workload and actual H2 query plans rather than indexing every filter combination. Measure the directory count query as well as fetching its page. No cache or search service is required initially.
 
 ## 7. API and UI behavior
 
@@ -251,26 +251,26 @@ The frontend uses shared field, alert, table, and action components. Disable dup
 
 ## 8. Seeding and migrations
 
-Run versioned Oracle SQL migrations before application readiness, using a documented migration identity; run normal application queries as a schema-scoped user with only the necessary permissions. Hibernate schema mode is validation, not automatic creation or update.
+Run versioned H2 SQL migrations before application readiness, through Liquibase using the configured application datasource. Hibernate schema mode is validation, not automatic creation or update.
 
-The seed command creates exactly 10,000 fictional employees in a fresh assessment dataset, including varied countries, currencies, departments, levels, and active/inactive statuses. Use a fixed random seed and stable employee IDs. A repeat run detects the completed dataset and does not duplicate or silently overwrite edited data. Resetting an existing dataset must be an explicit operator action.
+The planned explicit Liquibase demo context creates exactly 10,000 fictional employees in a fresh assessment dataset, including varied countries, currencies, departments, levels, and active/inactive statuses. Use a fixed random seed and stable employee IDs. A repeat run detects the completed dataset and does not duplicate or silently overwrite edited data. Resetting an existing dataset must be an explicit operator action.
 
-Keep small deterministic reporting fixtures separate from the large demo seed. Seed valid joining dates and immutable initial salary/actor baselines; include effective-dated raises and leaving dates for the monthly estimate fixtures. Provision the demo HR account separately from employee seeding. Do not run destructive seeding automatically in normal production startup.
+Keep small deterministic reporting fixtures separate from the large demo seed. Seed valid joining dates and immutable initial salary/actor baselines; include effective-dated raises and leaving dates for the monthly estimate fixtures. Provision the demo HR account separately from employee seeding. The large employee seed must be explicitly selected; normal restarts reuse saved data.
 
 ## 9. Verification and delivery
 
 - TDD is the working method for core business behavior and bug fixes: select one behavioral example, observe its expected failure, implement the smallest change, and refactor while tests remain green. Do not count tests added after implementation as evidence of test-first development.
 - Unit tests cover normalization, salary/currency precision, required reasons, filter semantics, and rounding using fixed expected values.
-- Oracle integration tests cover constraints, salary/history rollback, optimistic races, idempotent retries, inactive exclusion, aggregate accuracy, odd/even medians, and timestamp handling.
+- H2 integration tests cover constraints, salary/history rollback, optimistic races, idempotent retries, inactive exclusion, aggregate accuracy, odd/even medians, and timestamp handling.
 - Security integration tests cover authentication, HR authorization, CSRF, session expiry, and logout. Browser tests exercise the actual UI/API/database workflow.
 - Playwright covers sign-in, lookup, add/edit, salary update/history, inactive confirmation, and reports, including essential validation/error recovery. The existing starter test only verifies browser installation.
 - Record actual response times and query plans against 10,000 employees in the documented environment. No performance target or passing result is claimed before measurement.
-- Deploy an HTTPS application with persistent Oracle storage, externally supplied secrets, migrations, health checks, and documented restart/setup behavior. An initial single backend instance avoids introducing distributed session infrastructure; sessions may expire on restart.
+- Deploy an HTTPS application with persistent H2 storage, externally supplied secrets, migrations, health checks, and documented restart/setup behavior. An initial single backend instance avoids introducing distributed session infrastructure; sessions may expire on restart.
 - Update the README and [engineering decision log](engineering-notes.md) while building. Testing/performance documentation must record observed results when available. Complete deployment/demo links before submission.
 
-Configure continuous integration to run reproducible builds, fast unit/security/API checks, Oracle integration tests, and the essential browser suite. Keep fast feedback separate from slower environment-dependent checks, publish failures and durations, and fix flaky tests rather than treating reruns as proof of correctness. Pin tool versions and use the same migration path in tests and deployment.
+Configure continuous integration to run reproducible builds, fast unit/security/API checks, H2 integration tests, and the essential browser suite. Keep fast feedback separate from slower environment-dependent checks, publish failures and durations, and fix flaky tests rather than treating reruns as proof of correctness. Pin tool versions and use the same migration path in tests and deployment.
 
-Expose minimal health/readiness endpoints and record request correlation IDs, response latency, traffic, errors, and resource saturation where available. Protect operational endpoints and exclude sensitive salary and authentication data from logs. Measure endpoint percentiles and Oracle query plans against the documented workload before adding indexes, caches, or infrastructure. See the [verification plan](testing-strategy.md) for recording actual results.
+Expose minimal health/readiness endpoints and record request correlation IDs, response latency, traffic, errors, and resource saturation where available. Protect operational endpoints and exclude sensitive salary and authentication data from logs. Measure endpoint percentiles and H2 query plans against the documented workload before adding indexes, caches, or infrastructure. See the [verification plan](testing-strategy.md) for recording actual results.
 
 ### Concepts reserved for a demonstrated need
 
@@ -290,18 +290,18 @@ Basic connection/query timeouts and handling uncertain salary-save outcomes rema
 
 ## 10. Implementation order
 
-1. Use the saved API contracts as implementation inputs and pin compatible dependency/tool versions, including the AngularJS component library. Implement the specified Oracle column/input limits consistently.
+1. Use the saved API contracts as implementation inputs and pin compatible dependency/tool versions, including the AngularJS component library. Implement the specified H2 column/input limits consistently.
 2. Initialize Git if needed and commit the existing requirements and design artifacts before application implementation; do not backdate history.
-3. Bootstrap the backend, frontend build, Oracle configuration, migrations, and named HR authentication.
+3. Bootstrap the backend, frontend build, H2 configuration, migrations, and named HR authentication.
 4. Implement directory and employee maintenance, then salary/history transactions and conflict/retry handling through small red–green–refactor increments.
 5. Implement monthly base-pay estimates and reporting, complete workflow tests, seed and measure the full dataset, and deploy.
 6. Record observed results, review the UI, produce the demo video, and complete submission documentation.
 
 ## References and related decisions
 
-- [Requirements](requirements.md), [business rules](requirements-rules.md), and [Oracle database decision](database-oracle.md)
+- [Requirements](requirements.md), [business rules](requirements-rules.md), and [H2 database decision](database-h2.md)
 - [Figma UI handoff](design/figma-ui.md) and [source flow diagrams](ui-flows/)
 - [Spring Security password storage](https://docs.spring.io/spring-security/reference/features/authentication/password-storage.html)
-- [Oracle Spring integration](https://www.oracle.com/apac/database/technologies/oracledb-and-spring-springboot.html)
-- [Flyway Oracle support](https://documentation.red-gate.com/flyway/reference/database-driver-reference/oracle-database)
+- [H2 features](https://h2database.github.io/html/features.html)
+- [Liquibase Spring Boot configuration](https://contribute.liquibase.com/extensions-integrations/directory/integration-docs/springboot/configuration/)
 - [Testing strategy and verification plan](testing-strategy.md)

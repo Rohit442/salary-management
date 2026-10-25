@@ -82,4 +82,4 @@ Do not automatically retry 400/403/404/409 errors. A 401 requires reauthenticati
 
 ## Contract verification
 
-Verify request/response schemas and curl examples against the running backend. Follow the [testing strategy](testing-strategy.md) for HTTP/security, Oracle transaction/concurrency, and essential browser checks.
+Verify request/response schemas and curl examples against the running backend. Follow the [testing strategy](testing-strategy.md) for HTTP/security, H2 transaction/concurrency, and essential browser checks.

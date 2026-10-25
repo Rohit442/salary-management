@@ -14,7 +14,7 @@ This contract defines employee directory, creation, details, and status operatio
 | PUT | `/api/employees/{employeeId}/details` | 200 | Replace all editable employee details |
 | PUT | `/api/employees/{employeeId}/status` | 200 | Set employment status to inactive |
 
-`{employeeId}` is the public, immutable employee ID, such as `EMP-004218`, not the internal Oracle primary key. PUT replaces the entire named subresource; it does not replace the complete employee, salary, or history.
+`{employeeId}` is the public, immutable employee ID, such as `EMP-004218`, not the internal H2 primary key. PUT replaces the entire named subresource; it does not replace the complete employee, salary, or history.
 
 ## 2. Shared protocol and access
 
@@ -42,7 +42,7 @@ Concurrency uses a JSON `version` field, not ETag/If-Match. No idempotency-key b
 
 ## 3. Data definitions and validation
 
-All required strings are trimmed and must remain nonblank, unless stated otherwise. Lengths below are maximum Unicode code-point counts after trimming; migrations must enforce compatible Oracle character semantics. Persist the normalized work email in lowercase. Trim employee IDs, then require their uppercase pattern; do not silently change an existing ID.
+All required strings are trimmed and must remain nonblank, unless stated otherwise. Lengths below are maximum Unicode code-point counts after trimming; migrations must enforce compatible H2 character semantics. Persist the normalized work email in lowercase. Trim employee IDs, then require their uppercase pattern; do not silently change an existing ID.
 
 | Field | JSON type | Contract rule |
 |---|---|---|
@@ -63,7 +63,7 @@ All required strings are trimmed and must remain nonblank, unless stated otherwi
 | `version` | Integer | Nonnegative safe JSON integer; returned on reads/writes and required for PUT |
 | `createdAt`, `updatedAt` | String | Server-generated ISO-8601 instant, serialized in UTC with `Z` |
 
-For an initial two-fraction-digit currency, valid input includes `"1320000"`, `"1320000.0"`, or `"1320000.00"`; normalize the response to `"1320000.00"`. Reject `"1,320,000.00"`, `"1e6"`, numeric JSON `1320000`, zero, negative values, and more than the allowed fractional digits. Reject excess precision rather than rounding an input, even when additional digits are zeros. Money is stored with Oracle `NUMBER(19,4)` and Java `BigDecimal`; the API enforces the tighter currency precision and at most 15 integer digits.
+For an initial two-fraction-digit currency, valid input includes `"1320000"`, `"1320000.0"`, or `"1320000.00"`; normalize the response to `"1320000.00"`. Reject `"1,320,000.00"`, `"1e6"`, numeric JSON `1320000`, zero, negative values, and more than the allowed fractional digits. Reject excess precision rather than rounding an input, even when additional digits are zeros. Money is stored with H2 `DECIMAL(19,4)` and Java `BigDecimal`; the API enforces the tighter currency precision and at most 15 integer digits.
 
 Initial reference vocabulary for this contract:
 
@@ -596,9 +596,9 @@ Use [red–green–refactor](testing-strategy.md) to verify:
 
 - All five request/response schemas, required headers, access checks, CSRF rejection, and error mapping.
 - Directory defaults, multi-select AND/OR behavior, literal search escaping, deterministic ordering, empty/out-of-range pages, and consistent page/count snapshots.
-- Employee ID/email uniqueness against Oracle, including concurrent creation and inactive records; no partial create and no invented initial salary-change entry.
+- Employee ID/email uniqueness against H2, including concurrent creation and inactive records; no partial create and no invented initial salary-change entry.
 - Complete replacement semantics for details, forbidden-field rejection, immutable identity/currency/baseline, employment date validation, inclusive termination, future end dates, inactive detail edits, and no-op behavior.
-- Stale versions, real concurrent transactions, uncertain retry reconciliation, and status/salary race behavior against Oracle.
+- Stale versions, real concurrent transactions, uncertain retry reconciliation, and status/salary race behavior against H2.
 - Status preservation of salary/history, report exclusion, and salary-update rejection after inactivation when those features exist.
 - Each of the five curl examples against the running backend, with real responses recorded separately from these examples.
 

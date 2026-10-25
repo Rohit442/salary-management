@@ -17,6 +17,15 @@ export function buildSalaryPayload(draft, employee) {
     reason: draft.reason, version: employee.version };
 }
 
+function confirmsSalaryRejection(error) {
+  // These domain errors occur after the backend checks the saved operation key.
+  if (error.status === 409) return ['VERSION_CONFLICT', 'EMPLOYEE_INACTIVE', 'IDEMPOTENCY_KEY_REUSED'].includes(error.code);
+  if (error.status === 404) return error.code === 'EMPLOYEE_NOT_FOUND';
+  return error.status === 400 && error.code === 'VALIDATION_ERROR'
+    && error.fieldErrors.some(issue => (issue.field === 'annualBaseSalary' && issue.code === 'SALARY_UNCHANGED')
+      || (issue.field === 'effectiveDate' && ['EFFECTIVE_DATE_NOT_AFTER_LATEST', 'INVALID_DATE_ORDER'].includes(issue.code)));
+}
+
 function setup(vm, $scope) {
   let destroyed = false;
   $scope.$on('$destroy', () => { destroyed = true; });
@@ -94,6 +103,7 @@ const detailTemplate = `
 function DetailController(api, $routeParams, $location, $scope, $mdDialog) {
   const vm = this;
   const alive = setup(vm, $scope);
+  $scope.$on('$destroy', () => { if (vm.confirming) $mdDialog.cancel(); });
   let estimateRequest = 0;
   vm.id = $routeParams.id || $routeParams.employeeId;
   vm.month = today().slice(0, 7);
@@ -116,7 +126,7 @@ function DetailController(api, $routeParams, $location, $scope, $mdDialog) {
     finally { if (serial === estimateRequest) vm.estimateLoading = false; vm.paint(); }
   };
   vm.confirmInactive = async event => {
-    if (vm.saving || vm.confirming || vm.statusNeedsReview || vm.employee.employmentStatus !== 'ACTIVE') return;
+    if (!alive() || vm.saving || vm.confirming || vm.statusNeedsReview || vm.employee.employmentStatus !== 'ACTIVE') return;
     vm.confirming = true;
     const reviewed = { ...vm.employee };
     try {
@@ -124,6 +134,7 @@ function DetailController(api, $routeParams, $location, $scope, $mdDialog) {
         .textContent(`${reviewed.employeeId} · ${reviewed.department}. This employee will be excluded from compensation reports and salary updates will be disabled. Their record, salary history and monthly estimates remain available. Employment dates stay unchanged.`)
         .ariaLabel('Confirm employee inactivation').targetEvent(event).ok('Mark inactive').cancel('Cancel'));
     } catch { vm.confirming = false; vm.paint(); return; }
+    if (!alive()) return;
     vm.confirming = false; vm.saving = true; vm.error = null; vm.paint();
     try { vm.employee = await api.send('PUT', `${employeePath(vm.id)}/status`, { employmentStatus: 'INACTIVE', version: reviewed.version }); vm.saved = 'Employee marked inactive.'; }
     catch (error) { vm.statusNeedsReview = error.code === 'VERSION_CONFLICT' || error.uncertain; vm.fail(error); }
@@ -238,7 +249,8 @@ function SalaryController(api, $routeParams, $location, $scope, $timeout) {
       vm.operation = null; vm.uncertain = false;
       if (alive()) $location.path(`/employees/${vm.id}`).search({ saved: 'salary' });
     } catch (error) {
-      vm.uncertain = Boolean(error.uncertain || !error.status || error.status >= 500);
+      vm.uncertain = Boolean(error.uncertain || !error.status || error.status >= 500
+        || (vm.uncertain && !confirmsSalaryRejection(error)));
       vm.needsReview = ['VERSION_CONFLICT', 'EMPLOYEE_INACTIVE'].includes(error.code);
       if (!vm.uncertain) vm.operation = null;
       if (vm.uncertain && error.retryAfter > 0) { vm.retryWait = true; timer = $timeout(() => { vm.retryWait = false; }, error.retryAfter * 1000); }

@@ -312,6 +312,26 @@ test.describe('Frontend workflows with isolated contract fixtures', () => {
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
   });
 
+  test('leaving employee details dismisses its inactivation confirmation without changing status', async ({ page }) => {
+    const state = await fixtureApi(page);
+    await open(page, '/employees');
+    await page.getByRole('link', { name: 'Priya Sharma', exact: true }).click();
+    await page.getByRole('button', { name: 'Mark inactive', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Confirm employee inactivation', exact: true });
+    await expect(dialog).toBeVisible();
+
+    await page.goBack();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Employee directory', exact: true })).toBeVisible();
+    expect(state.requests.filter(request => request.path.endsWith('/status') && request.method === 'PUT')).toHaveLength(0);
+
+    await page.goForward();
+    await page.getByRole('button', { name: 'Mark inactive', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Mark inactive', exact: true }).click();
+    await expect(page.getByText('Employee marked inactive.', { exact: true })).toBeVisible();
+    expect(state.requests.filter(request => request.path.endsWith('/status') && request.method === 'PUT')).toHaveLength(1);
+  });
+
   test('a pending inactivation disables repeated status submissions', async ({ page }) => {
     await fixtureApi(page);
     let release!: () => void;

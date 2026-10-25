@@ -119,6 +119,8 @@ For concurrent duplicate requests, resolve a losing uniqueness/version race afte
 
 A replay may succeed after the employee becomes inactive or receives another salary update: it only confirms a previous operation. It still requires current HR access and valid CSRF. Refetch employee details after success/replay to display the current state. Never silently replay writes after reauthentication without user review.
 
+After an unconfirmed save, a retry rejected before replay lookup does not resolve the original operation. Preserve its frozen payload and key through CSRF rejection, rate limiting, token-refresh failure and structural validation errors. Refresh CSRF before an explicit retry when required. Release the operation on successful confirmation or a definitive service rejection after replay lookup; a version conflict still requires review before a new operation.
+
 **Curl:**
 
 ```sh

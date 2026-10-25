@@ -9,6 +9,7 @@ This log records adopted engineering decisions, their rationale, and supporting 
 | Manage annual base salaries and monthly base-pay estimates | Cover compensation maintenance and joining/leaving calculations |
 | Keep monetary reports separated by currency | Avoid unsupported exchange-rate assumptions and misleading totals |
 | Use Java and Spring Boot | Match the user's chosen ecosystem |
+| Bootstrap with Java 21 and Spring Boot 3.5.16 | Pin the backend baseline in the Maven POM; use Boot dependency management for compatible Spring, Oracle, Flyway, and test versions |
 | Use AngularJS | Follow the assignment's Java-specific frontend wording |
 | Use Oracle Database | User explicitly chose Oracle after comparing database options |
 | Build a modular monolith | Keep transactions, deployment, and internal responsibilities manageable |

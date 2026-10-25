@@ -2,13 +2,23 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, and eight Figma screens are available. Application implementation, Oracle provisioning, application tests, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend Maven configuration are available. Application implementation, Oracle provisioning, application tests, CI, and deployment are pending. The current Playwright starter verifies browser setup.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
 ## Planned application stack
 
 Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **Oracle Database**, using versioned Oracle SQL migrations. Local database development will use Oracle Database Free. See the [product requirements](docs/requirements.md) and [Oracle database setup guidance](docs/database-oracle.md).
+
+## Backend setup in IntelliJ IDEA
+
+1. Open [backend/pom.xml](backend/pom.xml) as a Maven project.
+2. In **File → Project Structure → Project → SDK**, select **Download JDK** and choose Java 21, or select an existing JDK 21 installation.
+3. Set the Maven importer and runner to use the project JDK, then reload the Maven project. IntelliJ's bundled Maven can resolve the dependencies.
+
+The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, Oracle JDBC, Flyway with Oracle support, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
+
+JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/sdk.html).
 
 ## Project documentation
 

@@ -1,5 +1,11 @@
 # ACME Salary Management
 
+## Demo
+
+[Watch the demo video (MP4, 3:58)](docs/demo/acme-salary-management-demo.mp4) · [Chapter guide](docs/demo/demo-chapters.txt)
+
+The recording covers all eight pages and the main workflows, including validation, employee creation/editing, salary history, monthly estimates, reports, inactivation and mobile sign-out. It is silent, with 13 chapter labels.
+
 ## Quick start
 
 Install **Git, Java 21, and Node.js 26 with npm**. Java must be available on your PATH. Maven is included through the backend wrapper; no separate database installation or environment file is required for the default local setup.

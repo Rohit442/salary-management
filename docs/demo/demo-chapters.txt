@@ -1,0 +1,20 @@
+ACME Salary Management — Demo chapters
+
+Sample account: maya.rao@acme.example
+Demo employee: Avery Demo · EMP-090026
+This demo uses the live local app. The demo employee is inactive at the end.
+Video is silent; chapter captions and embedded chapter markers identify each workflow.
+
+00:00  01 · Sign in and validation
+00:14  02 · Directory, sorting and pagination
+00:31  03 · Filter the employee directory
+00:54  04 · Add employee and ID validation
+01:18  05 · Employee details and initial salary
+01:31  06 · Edit employee details
+01:44  07 · Update salary with validation
+02:06  08 · Salary history and audit trail
+02:16  09 · Monthly estimates and proration
+02:34  10 · Compensation reports and grouping
+03:06  11 · Search suggestions and employee review
+03:16  12 · Inactivate with confirmation
+03:38  13 · Mobile layout and sign out

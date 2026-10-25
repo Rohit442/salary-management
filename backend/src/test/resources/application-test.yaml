@@ -3,3 +3,6 @@ spring:
     url: jdbc:h2:mem:salary-management-test;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
+  liquibase:
+    parameters:
+      employeeCount: 20

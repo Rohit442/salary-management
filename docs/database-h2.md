@@ -10,7 +10,7 @@ The default JDBC URL is `jdbc:h2:file:~/.acme-salary-management/salary-managemen
 
 Optional overrides are `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; defaults are the URL above, `sa`, and an empty password. Keep local database files outside source control.
 
-Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yaml`. Its two changesets create `sample_message` and insert one row with ID `1` and message `hello Rohit`. Applied changesets are recorded in `DATABASECHANGELOG`; restarting neither duplicates the seed nor overwrites edited rows. Add new changesets for later changes rather than editing applied ones.
+Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yaml`. Its changesets create `sample_message` with `hello Rohit`, create `employee`, and invoke `EmployeeSeedChange` to generate and insert 10,000 fictional employees using Datafaker 2.7.0. Liquibase executes the generated insert statements within the seed changeset transaction and manages its connection. Applied changesets are recorded in `DATABASECHANGELOG`; restarting neither duplicates the seed nor overwrites edited rows. Add new changesets for later changes rather than editing applied ones.
 
 Spring Security currently supplies development authentication: username `user` and the generated password printed at startup. Use that password when prompted by curl:
 
@@ -30,8 +30,14 @@ This endpoint reads the row through the SQL utility, using Spring JDBC to acquir
 
 `./mvnw verify` runs tests against a separate in-memory H2 database and temporary file databases. The restart test closes and reopens an application context, verifies saved data survives, and checks the seed has not run twice.
 
-The future 10,000-employee dataset will use explicitly selected Liquibase seed contexts, separate from small test fixtures. The current implemented seed contains only the one sample row.
+The first database migration automatically generates 10,000 employees across five countries/currencies, six departments, six job levels, and active/inactive statuses. Names come from Datafaker; IDs and fictional `@acme.example` addresses remain unique. Salary amounts use decimals, with joining/end dates and initial salary baselines. Fixed random seeds and a fixed reference date make the dataset reproducible with the pinned library version.
 
-Use `BigDecimal` and `DECIMAL(19,4)` for salary amounts when implementing the employee schema. Validate constraints, reports, transactions, and retry behavior against H2 using the same Liquibase migrations.
+`spring.liquibase.parameters.employeeCount` defaults to `10000`; the test profile uses `20`. Keep this changeset parameter unchanged for an existing database. The file-persistence test explicitly uses 10,000 employees, edits a row, restarts, and verifies that the edit and row count survive without another seed execution.
+
+Existing databases containing the earlier sample changesets receive only the new employee schema/seed on their next run. The sample API remains `GET /api/sample`; employee endpoints are tracked in the README.
+
+The employee schema uses `DECIMAL(19,4)`; generated salary amounts use `BigDecimal`. Validate constraints, reports, transactions, and retry behavior against H2 using the same Liquibase migrations.
 
 References: [H2 features](https://h2database.github.io/html/features.html), [Spring database initialization](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html), [Liquibase configuration](https://contribute.liquibase.com/extensions-integrations/directory/integration-docs/springboot/configuration/).
+
+Implementation references: [Datafaker repeatable randomness](https://www.datafaker.net/documentation/usage/), [Liquibase custom changes](https://docs.liquibase.com/community/reference-guide-5-0-2/change-types/customchange).

@@ -64,3 +64,12 @@ Add observed implementation results and significant decision changes to this log
 - Maven `verify` passed: three tests, zero failures/errors. Tests verify the seeded API response, unauthenticated rejection, and file persistence after closing/reopening the application with no repeated seed or overwritten edits.
 - Packaged application HTTP check returned 200 with `{"id":1,"message":"hello Rohit"}` using development authentication; the unauthenticated JSON request returned 401.
 - Verification used IntelliJ's bundled JDK 25 with Java 21 compilation target. Tests use isolated databases; the live sample used the default persistent home-directory H2 file.
+
+## First-run Datafaker seed — 25 October 2026
+
+- Use the supplied Datafaker 2.7.0 dependency in a Liquibase `CustomSqlChange`. Generate typed insert statements in Java; Liquibase owns SQL execution, connection lifecycle, the seed transaction, and applied-change tracking. Existing sample changesets remain unchanged.
+- The employee seed now runs automatically once, replacing the earlier plan for an explicitly selected demo context. Default: 10,000 employees. Fast integration fixture: 20. Fixed randomness and a fixed reference date make fictional names, amounts, dates, and identifiers reproducible.
+- Added the employee table with unique employee IDs/emails, decimal salary/baseline fields, employment dates, version, timestamps, and basic integrity constraints. Salary-history and HR-authentication schema implementation remains tracked in the README.
+- Test-first evidence: the file-restart integration test failed with H2 `Table EMPLOYEE not found` before the employee schema/seed was implemented.
+- Maven `verify` passed: four tests, zero failures/errors. The full 10,000-row file database survived application restart with an edited employee name intact and exactly one recorded employee seed execution. The small fixture verified unique identities, five country/currency groups, and positive consistent salary baselines. Existing sample/authentication checks remain green.
+- Configure Mockito as a startup Java agent for tests, avoiding dynamic self-attachment on the bundled JDK. Verification used JDK 25 with Java 21 compilation target.

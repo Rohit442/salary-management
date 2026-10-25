@@ -31,6 +31,16 @@ class SalaryManagementApplicationTests {
     }
 
     @Test
+    void seedsConfiguredEmployeeFixtureWithUniqueIdentitiesAndValidAmounts() {
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM employee", Integer.class)).isEqualTo(20);
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT employee_id) FROM employee", Integer.class)).isEqualTo(20);
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT work_email) FROM employee", Integer.class)).isEqualTo(20);
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT country_code) FROM employee", Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT currency_code) FROM employee", Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM employee WHERE annual_base_salary <= 0 OR initial_annual_base_salary <> annual_base_salary OR initial_salary_effective_from <> joining_date OR salary_effective_from <> joining_date", Integer.class)).isZero();
+    }
+
+    @Test
     void rejectsUnauthenticatedRequest() throws Exception {
         mvc.perform(get("/api/sample").accept("application/json"))
                 .andExpect(status().isUnauthorized());

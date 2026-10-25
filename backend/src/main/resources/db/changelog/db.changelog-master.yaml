@@ -30,3 +30,14 @@ databaseChangeLog:
               - column:
                   name: message
                   value: hello Rohit
+  - include:
+      file: db/changelog/003-create-employees.yaml
+  - changeSet:
+      id: 004-seed-demo-employees
+      author: salary-management
+      changes:
+        - customChange:
+            class: com.acme.salarymanagement.seed.EmployeeSeedChange
+            param:
+              - name: employeeCount
+                value: ${employeeCount}

@@ -2,7 +2,7 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend now includes persistent H2, Liquibase table creation/seeding, and an authenticated `GET /api/sample` returning a database-backed greeting. Salary-management APIs, the employee schema and 10,000-record dataset, named HR authentication, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend now includes persistent H2, Liquibase schema creation and first-run Datafaker seeding of 10,000 employees, and an authenticated `GET /api/sample` returning a database-backed greeting. Salary-management APIs, salary-history/authentication tables, named HR authentication, CI, and deployment are pending. The current Playwright starter verifies browser setup.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -16,7 +16,7 @@ Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **H2**, 
 2. In **File → Project Structure → Project → SDK**, select **Download JDK** and choose Java 21, or select an existing JDK 21 installation.
 3. Set the Maven importer and runner to use the project JDK, then reload the Maven project. IntelliJ's bundled Maven can resolve the dependencies.
 
-The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, H2 JDBC, Liquibase, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
+The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, H2 JDBC, Liquibase, Datafaker 2.7.0, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
 
 JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/sdk.html).
 
@@ -24,7 +24,7 @@ JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/
 
 No database installation is needed. The default H2 file lives at `~/.acme-salary-management/salary-management.mv.db` and survives backend restarts. Optional `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` override the defaults. Remove old Oracle overrides before running.
 
-Liquibase creates `sample_message` and seeds `hello Rohit` once. Hibernate validates the schema. Tests use separate databases.
+Liquibase creates `sample_message` and `employee`, seeds `hello Rohit`, and generates 10,000 fictional employees on first run. Applied changesets prevent reseeding on later runs. Tests use separate databases with a 20-employee fixture; the restart integration test verifies the full 10,000-record dataset. Hibernate validates the schema.
 
 After startup, read the sample using the generated development password from the console (curl prompts for it):
 

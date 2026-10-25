@@ -26,7 +26,7 @@ flowchart LR
     hr -->|"HTTPS"| ui
     data -->|"JDBC"| oracle
     migration["Versioned Liquibase migrations"] --> database
-    seed["Explicit fictional-data seed command"] --> database
+    seed["First-run Datafaker seed changeset"] --> database
 ```
 
 The browser never connects directly to H2. Backend access checks are authoritative.
@@ -58,7 +58,7 @@ backend/
     reporting/      Filtered aggregates and grouping
     reference/      Supported currencies, countries, departments, job levels
     common/         Error responses and shared infrastructure
-  src/main/resources/db/migration/
+  src/main/resources/db/changelog/
 frontend/
   src/              AngularJS routes, components, API services and styles
 tests/              Playwright application workflows
@@ -251,11 +251,11 @@ The frontend uses shared field, alert, table, and action components. Disable dup
 
 ## 8. Seeding and migrations
 
-Run versioned H2 SQL migrations before application readiness, through Liquibase using the configured application datasource. Hibernate schema mode is validation, not automatic creation or update.
+Run versioned Liquibase changelogs before application readiness, through Liquibase using the configured application datasource. Hibernate schema mode is validation, not automatic creation or update.
 
-The planned explicit Liquibase demo context creates exactly 10,000 fictional employees in a fresh assessment dataset, including varied countries, currencies, departments, levels, and active/inactive statuses. Use a fixed random seed and stable employee IDs. A repeat run detects the completed dataset and does not duplicate or silently overwrite edited data. Resetting an existing dataset must be an explicit operator action.
+The first-run Liquibase Datafaker changeset creates exactly 10,000 fictional employees in a fresh assessment dataset, including varied countries, currencies, departments, levels, and active/inactive statuses. Use a fixed random seed and stable employee IDs. A repeat run detects the completed dataset and does not duplicate or silently overwrite edited data. Resetting an existing dataset must be an explicit operator action.
 
-Keep small deterministic reporting fixtures separate from the large demo seed. Seed valid joining dates and immutable initial salary/actor baselines; include effective-dated raises and leaving dates for the monthly estimate fixtures. Provision the demo HR account separately from employee seeding. The large employee seed must be explicitly selected; normal restarts reuse saved data.
+Keep small deterministic reporting fixtures separate from the large demo seed. Seed valid joining dates and immutable initial salary/actor baselines; include effective-dated raises and leaving dates for the monthly estimate fixtures. Provision the demo HR account separately from employee seeding. Normal startup applies the employee seed once; later restarts reuse saved data. Tests use a small fixture, with a separate full-dataset restart test.
 
 ## 9. Verification and delivery
 

@@ -55,7 +55,7 @@ Use **H2** with **Liquibase** for schema migrations and seed data. Local runs us
 - Enforce identity uniqueness, normalized work-email uniqueness, relationships, and positive amounts in the schema.
 - Keep salary and history writes in one transaction, with optimistic concurrency checks.
 - Verify H2 pagination, median, decimal aggregation, rounding, dates, and concurrent writes against deterministic fixtures.
-- Keep the 10,000-employee demo seed explicitly selected and separate from fast test fixtures; ordinary restarts reuse persisted data.
+- Apply the 10,000-employee Datafaker seed once through Liquibase on first run. Use small, separate fixtures for normal tests; ordinary restarts reuse persisted data.
 
 See [H2 database setup](database-h2.md).
 

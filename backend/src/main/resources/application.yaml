@@ -15,3 +15,5 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+    parameters:
+      employeeCount: 10000

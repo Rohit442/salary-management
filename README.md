@@ -2,7 +2,7 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend Maven configuration are available. Application implementation, Oracle provisioning, application tests, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. Business APIs, database migrations/seeding, Oracle provisioning, application verification, CI, and deployment are pending. The current Playwright starter verifies browser setup.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -19,6 +19,21 @@ Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **Oracle
 The POM pins Spring Boot 3.5.16 and lets its dependency management select compatible library versions. It includes Spring Web, Security, Validation, Data JPA, Oracle JDBC, Flyway with Oracle support, and unit/security test dependencies. Spring Boot's default logging supplies SLF4J. The Data JPA starter also supplies Spring JDBC for the connection-managed SQL utility.
 
 JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/sdk.html).
+
+### Oracle configuration and backend commands
+
+Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` in the IntelliJ run configuration or shell environment. For a local Oracle Free instance, the JDBC URL typically has the form `jdbc:oracle:thin:@localhost:1521/FREEPDB1`; use the actual service and application-schema credentials for your instance. Keep passwords out of source files.
+
+The configuration uses Flyway for migrations and Hibernate schema validation. The startup smoke test connects to the configured Oracle database.
+
+From `backend/`, use the supplied Maven wrapper:
+
+| Command | Purpose |
+|---|---|
+| `./mvnw clean verify` | Compile, run tests, and package the application |
+| `./mvnw spring-boot:run` | Start the backend with the configured Oracle connection |
+
+On Windows, use `mvnw.cmd` in place of `./mvnw`.
 
 ## Project documentation
 

@@ -10,6 +10,7 @@ This log records adopted engineering decisions, their rationale, and supporting 
 | Keep monetary reports separated by currency | Avoid unsupported exchange-rate assumptions and misleading totals |
 | Use Java and Spring Boot | Match the user's chosen ecosystem |
 | Bootstrap with Java 21 and Spring Boot 3.5.16 | Pin the backend baseline in the Maven POM; use Boot dependency management for compatible Spring, Oracle, Flyway, and test versions |
+| Reuse the supplied Spring project bootstrap and Maven wrapper | Retain the existing POM and `com.acme.salarymanagement` package; supply Oracle credentials through environment variables and use a real-database startup smoke test |
 | Use AngularJS | Follow the assignment's Java-specific frontend wording |
 | Use Oracle Database | User explicitly chose Oracle after comparing database options |
 | Build a modular monolith | Keep transactions, deployment, and internal responsibilities manageable |

@@ -11,6 +11,7 @@ Shared representation, security, errors, and retry rules for the application API
 | Authentication | GET | `/api/auth/me` |
 | Authentication | POST | `/api/auth/logout` |
 | [Employees](api-employees.md) | GET | `/api/employees` |
+| Employees | GET | `/api/employees/suggestions` |
 | Employees | GET | `/api/employees/{employeeId}` |
 | Employees | POST | `/api/employees` |
 | Employees | PUT | `/api/employees/{employeeId}/details` |

@@ -13,6 +13,8 @@ import org.springframework.dao.DuplicateKeyException;
 import com.acme.salarymanagement.bean.EmployeePage;
 import com.acme.salarymanagement.bean.EmployeeQuery;
 import com.acme.salarymanagement.bean.EmployeeResponse;
+import com.acme.salarymanagement.bean.EmployeeSuggestion;
+import com.acme.salarymanagement.bean.EmployeeSuggestionQuery;
 import com.acme.salarymanagement.exception.ApiRequestException;
 import com.acme.salarymanagement.service.EmployeeService;
 import com.acme.salarymanagement.util.SqlUtility;
@@ -66,6 +68,20 @@ public class EmployeeServiceImpl implements EmployeeService {
             long totalPages = (total + query.size() - 1) / query.size();
             return new EmployeePage(items, query.page(), query.size(), items.size(), total, totalPages,
                     new EmployeePage.Sort(query.sortField(), query.sortDirection()), query.page() > 0, query.page() + 1L < totalPages);
+        } catch (DataAccessException exception) { throw unavailable(exception); }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EmployeeSuggestion> suggestions(EmployeeSuggestionQuery query) {
+        String literal = query.prefix().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        try {
+            return sql.query("""
+                    SELECT employee_id, full_name FROM employee
+                    WHERE LOWER(full_name) LIKE ? ESCAPE '!'
+                    ORDER BY LOWER(full_name) ASC, id ASC FETCH FIRST ? ROWS ONLY
+                    """, (row, index) -> new EmployeeSuggestion(row.getString("employee_id"), row.getString("full_name")),
+                    literal + "%", query.limit());
         } catch (DataAccessException exception) { throw unavailable(exception); }
     }
 

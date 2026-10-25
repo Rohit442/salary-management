@@ -51,3 +51,47 @@ test('live sign-in, employee search/detail, currency reports, refresh and logout
   expect(signedOut.status()).toBe(401);
   expect(browserErrors).toEqual([]);
 });
+
+test('live name suggestions open a profile and retain the unchanged directory search', async ({ page }, testInfo) => {
+  const queries: URLSearchParams[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/employees') queries.push(url.searchParams);
+  });
+  await page.goto('/#!/sign-in');
+  await page.getByLabel('Work email', { exact: true }).fill('maya.rao@acme.example');
+  await page.getByLabel('Password', { exact: true }).fill('AcmeDev!2026');
+  const initialResponse = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const directory = await (await initialResponse).json();
+  expect(directory.size).toBe(100);
+  const first = directory.items[0];
+  const prefix = first.fullName.slice(0, 2).toLowerCase();
+  const input = page.getByLabel('Search by name or employee ID', { exact: true });
+  const lookup = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees/suggestions');
+  await input.fill(prefix);
+  const response = await lookup;
+  expect(response.status()).toBe(200);
+  const matches = await response.json();
+  expect(matches.length).toBeGreaterThan(0);
+  expect(matches.length).toBeLessThanOrEqual(8);
+  for (const match of matches) {
+    expect(Object.keys(match).sort()).toEqual(['employeeId', 'fullName']);
+    expect(match.fullName.toLowerCase().startsWith(prefix)).toBe(true);
+  }
+  const options = page.getByRole('listbox', { name: 'Employee suggestions' }).getByRole('option');
+  await expect(options).toHaveText(matches.map((match: { fullName: string }) => match.fullName));
+  expect(queries).toHaveLength(1);
+  await page.screenshot({ path: testInfo.outputPath('live-directory-suggestions.png'), fullPage: false });
+  await options.first().click();
+  await expect(page.getByRole('heading', { name: matches[0].fullName, exact: true })).toBeVisible();
+  expect(queries).toHaveLength(1);
+  await page.goBack();
+  await expect(input).toHaveValue(prefix);
+  await expect(page.locator('tbody tr')).toHaveCount(20);
+  expect(queries.at(-1)!.get('q')).toBeNull();
+  await input.fill(first.fullName.slice(1));
+  await input.press('Enter');
+  await expect(page.getByRole('table').getByRole('link', { name: first.fullName, exact: true })).toBeVisible();
+  await expect.poll(() => queries.at(-1)!.get('q')).toBe(first.fullName.slice(1));
+});

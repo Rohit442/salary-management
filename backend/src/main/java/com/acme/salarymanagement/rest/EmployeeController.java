@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import com.acme.salarymanagement.bean.ApiFieldError;
 import com.acme.salarymanagement.bean.EmployeePage;
 import com.acme.salarymanagement.bean.EmployeeResponse;
+import com.acme.salarymanagement.bean.EmployeeSuggestion;
 import com.acme.salarymanagement.exception.ApiOperationException;
 import com.acme.salarymanagement.exception.ApiRequestException;
 import com.acme.salarymanagement.service.AuthService;
@@ -17,6 +18,7 @@ import com.acme.salarymanagement.service.DashboardService;
 import com.acme.salarymanagement.service.EmployeeService;
 import com.acme.salarymanagement.util.SessionUtility;
 import com.acme.salarymanagement.validator.EmployeeRequestValidator;
+import com.acme.salarymanagement.validator.EmployeeSuggestionValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
@@ -38,10 +40,12 @@ public class EmployeeController {
     private final SessionUtility sessions;
     private final JsonRequestUtility bodies;
     private final EmployeeWriteValidator writeValidator;
+    private final EmployeeSuggestionValidator suggestionValidator;
     public EmployeeController(EmployeeService service, EmployeeRequestValidator validator,
             DashboardService references, AuthService auth, SessionUtility sessions,
-            JsonRequestUtility bodies,EmployeeWriteValidator writeValidator) {
+            JsonRequestUtility bodies,EmployeeWriteValidator writeValidator, EmployeeSuggestionValidator suggestionValidator) {
         this.service = service; this.validator = validator; this.references = references; this.auth = auth; this.sessions = sessions; this.bodies=bodies; this.writeValidator=writeValidator;
+        this.suggestionValidator = suggestionValidator;
     }
     @GetMapping(produces = "application/json")
     public ResponseEntity<EmployeePage> list(HttpServletRequest request, Authentication user) {
@@ -57,6 +61,20 @@ public class EmployeeController {
         } catch (ApiRequestException exception) { throw exception; }
         catch (IOException | RuntimeException exception) { throw new ApiOperationException(exception); }
     }
+    @GetMapping(value = "/suggestions", produces = "application/json")
+    public ResponseEntity<List<EmployeeSuggestion>> suggestions(HttpServletRequest request, Authentication user) {
+        List<ApiFieldError> errors;
+        try {
+            authorize(request, user);
+            errors = suggestionValidator.validate(request);
+            if (errors.isEmpty()) {
+                return ResponseEntity.ok(service.suggestions(suggestionValidator.query(request)));
+            }
+            throw invalid(errors);
+        } catch (ApiRequestException exception) { throw exception; }
+        catch (IOException | RuntimeException exception) { throw new ApiOperationException(exception); }
+    }
+
     @GetMapping(value = "/{employeeId}", produces = "application/json")
     public ResponseEntity<EmployeeResponse> details(@PathVariable String employeeId, HttpServletRequest request, Authentication user) {
         List<ApiFieldError> errors;

@@ -2,13 +2,13 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, all four JSON authentication APIs, the compensation-report and reference-data APIs, and all employee creation, detail, status, salary/history and monthly base-pay APIs. All 14 contracted backend APIs are implemented. Non-demo HR provisioning, CI and deployment remain pending.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, all four JSON authentication APIs, the compensation-report and reference-data APIs, and all employee creation, detail, status, salary/history and monthly base-pay APIs. All 15 contracted backend APIs are implemented, including the separate employee name-suggestions lookup. Non-demo HR provisioning, CI and deployment remain pending.
 
-The latest local Maven `clean verify` passed **171 tests with zero failures/errors/skips** and packaged the backend. This includes employee writes, salary replay/history, monthly estimates, real concurrent transactions and a complete HTTP business workflow, alongside the existing authentication, directory and report checks. Test databases and random-port servers are isolated from your running application on port 8080.
+The latest local Maven `clean verify` passed **190 tests with zero failures/errors/skips** and packaged the backend. This includes employee writes, salary replay/history, monthly estimates, real concurrent transactions and a complete HTTP business workflow, alongside the existing authentication, directory and report checks. Test databases and random-port servers are isolated from your running application on port 8080.
 
-The AngularJS frontend now implements all eight Figma pages with responsive layouts. Sign-in, employee directory/details, reference options and compensation reports are verified against the real APIs. Employee write, history and estimate screens use the contracted routes, which are now implemented. The previously recorded live frontend verification covered authentication and read workflows. Frontend verification: **29 unit tests and 58 Chromium Playwright checks passed**, including one live-API workflow; the production asset build passes.
+The AngularJS frontend now implements all eight Figma pages with responsive layouts. Sign-in, employee directory/details, reference options and compensation reports are verified against the real APIs. Employee write, history and estimate screens use the contracted routes, which are now implemented. The previously recorded live frontend verification covered authentication and read workflows. Frontend verification: **29 unit tests and 59 Chromium Playwright checks passed**, including two live-API workflows; the production asset build passes.
 
-The requested [directory revision](docs/design/figma-ui.md#directory-revision) is implemented in the frontend: names-only suggestions below the search box, filters applied when focus leaves a control, fixed 100-row pages without a size selector, direct-page navigation and restored directory context after employee review. Existing `q` substring semantics, backend pagination defaults and API regression expectations remain unchanged; the frontend calls a separate authenticated suggestions endpoint, whose backend implementation is next. The Figma preview is updated and visually checked, with a saved review image.
+The requested [directory revision](docs/design/figma-ui.md#directory-revision) is implemented in the frontend: names-only suggestions below the search box, filters applied when focus leaves a control, fixed 100-row pages without a size selector, direct-page navigation and restored directory context after employee review. Existing `q` substring semantics, backend pagination defaults and API regression expectations remain unchanged; the separate authenticated suggestions endpoint is implemented and verified through the real frontend. The Figma preview is updated and visually checked, with a saved review image.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -60,7 +60,7 @@ On Windows, use `mvnw.cmd` in place of `./mvnw`.
 
 ## Authentication APIs and tests
 
-Import [the Postman collection](docs/postman/acme-auth.postman_collection.json), keep cookies enabled, and run requests 01–03 to sign in. The collection includes all 14 contracted APIs across 15 requests, with logout last (15). Requests 09–14 demonstrate the employee creation, editing, salary/history, estimate and inactivation workflow. It includes the local demo variables and saves/refreshes the CSRF token automatically.
+Import [the Postman collection](docs/postman/acme-auth.postman_collection.json), keep cookies enabled, and run requests 01–03 to sign in. The collection documents the earlier 14 APIs across 15 requests, with logout last (15). Requests 09–14 demonstrate the employee creation, editing, salary/history, estimate and inactivation workflow. It includes the local demo variables and saves/refreshes the CSRF token automatically.
 
 | Method | Path | Result |
 |---|---|---|
@@ -99,9 +99,10 @@ Restart the backend to load these routes. Full request/response and curl example
 ## Employee read APIs
 
 - `GET /api/employees`: paginated directory with literal name/ID search, canonical filters and supported sorting; includes active and inactive employees.
+- `GET /api/employees/suggestions?prefix=R&limit=8`: names beginning with the typed prefix; returns only public employee IDs and full names.
 - `GET /api/employees/{employeeId}`: complete employee record, including the current version. Invalid IDs return 400; missing valid IDs return 404.
 
-Both use the authenticated HR session without CSRF for GET. Restart the backend after code changes. The [employee contract](docs/api-employees.md#5-get-apiemployees) includes query rules and curl examples. Postman requests 07–08 cover these endpoints before logout.
+All three use the authenticated HR session without CSRF for GET. Restart the backend after code changes. The [employee contract](docs/api-employees.md#5-get-apiemployees) includes query rules and curl examples. The suggestion request and response are documented in the [employee contract](docs/api-employees.md#51-get-apiemployeessuggestions).
 
 ## Employee writes, salary history and monthly estimates
 
@@ -120,7 +121,7 @@ Restart the backend to load the new routes and Liquibase migration 012. Existing
 - [Technical design](docs/technical-design.md), including architecture, database ER, and salary-update sequence diagrams
 - [Authentication API contract](docs/api-auth.md): CSRF, sign-in, current user and sign-out, with request/response and curl examples
 - [Employee API contract](docs/api-employees.md): directory, details, creation and versioned PUT operations for details/status
-- [Shared API conventions and endpoint index](docs/api-conventions.md): all 14 endpoints, common errors and retry rules
+- [Shared API conventions and endpoint index](docs/api-conventions.md): all 15 endpoints, common errors and retry rules
 - [Salary/history API contract](docs/api-salaries.md): atomic changes, versions, idempotent retries and paginated history
 - [Compensation report API contract](docs/api-reports.md): filters, grouping and currency-separated results
 - [Monthly base-pay API contract](docs/api-base-pay.md): effective salary selection, whole-month raises, and joining/leaving proration

@@ -1,6 +1,6 @@
 # Employee Management API Contract
 
-**Version:** 1.1.
+**Version:** 1.2.
 
 This contract defines employee directory, creation, details, and status operations. Follow [authentication](api-auth.md) and [shared API conventions](api-conventions.md).
 
@@ -9,6 +9,7 @@ This contract defines employee directory, creation, details, and status operatio
 | Method | Path | Success | Purpose |
 |---|---|---|---|
 | GET | `/api/employees` | 200 | Search/filter/sort a paginated directory |
+| GET | `/api/employees/suggestions` | 200 | Find a bounded list of full-name prefix matches |
 | GET | `/api/employees/{employeeId}` | 200 | Read a complete employee record |
 | POST | `/api/employees` | 201 | Create an active employee with initial salary |
 | PUT | `/api/employees/{employeeId}/details` | 200 | Replace all editable employee details |
@@ -19,7 +20,7 @@ This contract defines employee directory, creation, details, and status operatio
 ## 2. Shared protocol and access
 
 - Local example origin: `http://localhost:8080`; deployed origin requires HTTPS. 
-- All five endpoints require an authenticated, enabled HR user. Enforce this in the backend and honor account/permission revocation.
+- All six endpoints require an authenticated, enabled HR user. Enforce this in the backend and honor account/permission revocation.
 - Every write requires the current `X-CSRF-TOKEN` and its matching session cookie. Follow the sign-in/token-refresh flow in [api-auth.md](api-auth.md).
 - GET requests have no body. POST and PUT require UTF-8 JSON objects and `Content-Type: application/json`; reject malformed JSON, duplicate property names, unknown fields, and invalid types. Do not coerce JSON numbers into money strings or strings into version integers.
 - Return JSON for success/errors, `Cache-Control: no-store`, and a server-generated `X-Request-ID`. No HTML redirects. Never log salary bodies or sensitive employee data.
@@ -149,7 +150,7 @@ BASE_URL='http://localhost:8080'
 COOKIE_JAR='./acme-auth.cookies'
 ```
 
-The file must already contain an authenticated HR session; the setup above alone does not sign in. `CSRF_TOKEN` must be the refreshed token for that session. All five employee endpoints are implemented. The pre-existing-record examples use the fixture `EMP-004218`; creation uses `EMP-010001` and is independent of those edit examples.
+The file must already contain an authenticated HR session; the setup above alone does not sign in. `CSRF_TOKEN` must be the refreshed token for that session. The pre-existing-record examples use the fixture `EMP-004218`; creation uses `EMP-010001` and is independent of those edit examples.
 
 ## 5. GET /api/employees
 
@@ -255,6 +256,38 @@ curl --silent --show-error --fail-with-body --get \
 ```
 
 For multiple countries, repeat `--data-urlencode 'country=US'` alongside `country=IN`; do not send `country=IN,US`. **Failures:** 400, 401, 403, 405, 406, 415, 500, 503 using the shared codes. A directory read is safe to retry; results may change between reads.
+
+### 5.1. GET /api/employees/suggestions
+
+**Purpose:** Suggest employees whose full names begin with the typed text. This is independent of the paginated directory's existing `q` substring search. **Body/path parameters:** None. **Headers:** Authenticated HR cookie and `Accept`.
+
+| Query parameter | Type/default | Rules |
+|---|---|---|
+| `prefix` | Required string | Trimmed; 1–100 Unicode code points; case-insensitive literal prefix of the full name |
+| `limit` | Integer, default `8` | 1–10 |
+
+Reject unknown or repeated parameters, blank prefixes, and invalid limits with 400. Match punctuation literally, including `%`, `_` and `!`; escape SQL pattern characters and bind all values. Search includes active and inactive records across all directory categories. Table filters, employee-ID matching and paging parameters do not apply to this endpoint. Case-insensitive matching does not imply accent-insensitive matching.
+
+Order by lowercase full name, then internal employee ID ascending for deterministic ties. Limit rows in the query. No count query or database migration is required. Return a bare JSON array containing only public `employeeId` and `fullName`; do not include salary, email, category fields or internal keys. The frontend displays only the name and uses the public ID to open the profile.
+
+Success (`200`, shared response headers):
+
+```json
+[
+  { "employeeId": "EMP-004218", "fullName": "Ravi Sharma" },
+  { "employeeId": "EMP-006101", "fullName": "Riya Patel" }
+]
+```
+
+No matches returns `[]`. Example request:
+
+```sh
+curl -i -G -b "$COOKIE_JAR" -H 'Accept: application/json' \
+  --data-urlencode 'prefix=R' --data-urlencode 'limit=8' \
+  "$BASE_URL/api/employees/suggestions"
+```
+
+**Failures:** 400, 401, 403, 405, 406, 415, 500, 503 using the shared codes. GET needs no CSRF header. Account disabling and role revocation must take effect for an existing session. A failed lookup leaves the frontend's table search and page navigation available.
 
 ## 6. GET /api/employees/{employeeId}
 
@@ -594,13 +627,14 @@ Detail, status, and salary writes share the employee's optimistic version. A sim
 
 Use [red–green–refactor](testing-strategy.md) to verify:
 
-- All five request/response schemas, required headers, access checks, CSRF rejection, and error mapping.
+- All six request/response schemas, required headers, access checks, CSRF rejection, and error mapping.
 - Directory defaults, multi-select AND/OR behavior, literal search escaping, deterministic ordering, empty/out-of-range pages, and consistent page/count snapshots.
+- Suggestion prefix/interior separation, literal wildcard characters, Unicode length boundaries, limit validation, duplicate-name ordering, exact two-field responses, inactive inclusion and session revocation.
 - Employee ID/email uniqueness against H2, including concurrent creation and inactive records; no partial create and no invented initial salary-change entry.
 - Complete replacement semantics for details, forbidden-field rejection, immutable identity/currency/baseline, employment date validation, inclusive termination, future end dates, inactive detail edits, and no-op behavior.
 - Stale versions, real concurrent transactions, uncertain retry reconciliation, and status/salary race behavior against H2.
 - Status preservation of salary/history, report exclusion, and salary-update rejection after inactivation when those features exist.
-- Each of the five curl examples against the running backend, with real responses recorded separately from these examples.
+- Each curl example against the running backend, with real responses recorded separately from these examples.
 
 ## Related documents
 

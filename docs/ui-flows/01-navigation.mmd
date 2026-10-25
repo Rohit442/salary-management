@@ -1,12 +1,12 @@
 flowchart LR
-    %% Directory revision: Figma preview updated; final verification and implementation pending.
+    %% Directory suggestions respect applied category filters.
     entry([HR Manager]) --> login[Sign in]
     login --> access{Authorized HR user?}
     access -->|"No"| denied[Show access error]
     denied --> login
     access -->|"Yes"| directory["Employee directory<br/>Existing substring search unchanged"]
     directory -->|"Table search: blur or Enter"| reset[Reset to page 1]
-    directory -->|"At least 1 character; pause 300 ms"| suggestions["Names-only prefix suggestions<br/>Table results unchanged"]
+    directory -->|"At least 1 character; pause 300 ms"| suggestions["Names-only prefix suggestions<br/>Within applied category filters<br/>Table results unchanged"]
     suggestions -->|"Select name or highlighted result with Enter"| profile[Employee details]
     suggestions -->|"Escape, outside click or empty input"| directory
     suggestions -->|"Failure: keep table available"| directory

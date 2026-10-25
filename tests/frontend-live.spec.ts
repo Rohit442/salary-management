@@ -95,3 +95,42 @@ test('live name suggestions open a profile and retain the unchanged directory se
   await expect(page.getByRole('table').getByRole('link', { name: first.fullName, exact: true })).toBeVisible();
   await expect.poll(() => queries.at(-1)!.get('q')).toBe(first.fullName.slice(1));
 });
+
+test('live suggestions respect all applied directory filters', async ({ page }) => {
+  await page.goto('/#!/sign-in');
+  await page.getByLabel('Work email', { exact: true }).fill('maya.rao@acme.example');
+  await page.getByLabel('Password', { exact: true }).fill('AcmeDev!2026');
+  const initial = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const directory = await (await initial).json();
+  const target = directory.items[0];
+  const refs = await (await page.request.get('/api/reference-data')).json();
+  const selections = [
+    ['Country', 'country', target.countryCode, refs.countries.find((value: { code: string }) => value.code === target.countryCode).label],
+    ['Department', 'department', target.department, refs.departments.find((value: { value: string }) => value.value === target.department).label],
+    ['Job level', 'jobLevel', target.jobLevel, target.jobLevel],
+    ['Currency', 'currency', target.currency, refs.currencies.find((value: { code: string }) => value.code === target.currency).label],
+  ];
+  for (const [label, key, value, option] of selections) {
+    const control = page.locator(`md-select[aria-label^="${label}"]`);
+    await control.click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(control).toBeFocused();
+    const filtered = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees' && new URL(reply.url()).searchParams.get(key) === value);
+    await page.getByRole('heading', { name: 'Employee directory', exact: true }).click();
+    expect((await filtered).status()).toBe(200);
+  }
+  const lookup = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees/suggestions');
+  const prefix = target.fullName.slice(0, 2);
+  await page.getByLabel('Search by name or employee ID', { exact: true }).fill(prefix);
+  const response = await lookup;
+  for (const [, key, value] of selections) expect(new URL(response.url()).searchParams.getAll(key)).toEqual([value]);
+  expect(response.status()).toBe(200);
+  const matches = await response.json();
+  const expected = directory.items.filter((record: typeof target) => record.fullName.toLowerCase().startsWith(prefix.toLowerCase()) &&
+    record.countryCode === target.countryCode && record.department === target.department &&
+    record.jobLevel === target.jobLevel && record.currency === target.currency).slice(0, 8);
+  expect(matches).toEqual(expected.map(({ employeeId, fullName }: typeof target) => ({ employeeId, fullName })));
+  await expect(page.getByRole('listbox', { name: 'Employee suggestions' }).getByRole('option')).toHaveText(expected.map((record: typeof target) => record.fullName));
+});

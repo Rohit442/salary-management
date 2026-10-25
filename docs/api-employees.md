@@ -1,6 +1,6 @@
 # Employee Management API Contract
 
-**Version:** 1.2.
+**Version:** 1.3.
 
 This contract defines employee directory, creation, details, and status operations. Follow [authentication](api-auth.md) and [shared API conventions](api-conventions.md).
 
@@ -265,10 +265,16 @@ For multiple countries, repeat `--data-urlencode 'country=US'` alongside `countr
 |---|---|---|
 | `prefix` | Required string | Trimmed; 1–100 Unicode code points; case-insensitive literal prefix of the full name |
 | `limit` | Integer, default `8` | 1–10 |
+| `country` | Repeated optional string | Supported country codes; OR within category |
+| `department` | Repeated optional string | Supported canonical departments; OR within category |
+| `jobLevel` | Repeated optional string | Supported levels; OR within category |
+| `currency` | Repeated optional string | Supported currency codes; OR within category |
 
-Reject unknown or repeated parameters, blank prefixes, and invalid limits with 400. Match punctuation literally, including `%`, `_` and `!`; escape SQL pattern characters and bind all values. Search includes active and inactive records across all directory categories. Table filters, employee-ID matching and paging parameters do not apply to this endpoint. Case-insensitive matching does not imply accent-insensitive matching.
+Reject unknown parameters, repeated scalar parameters, blank prefixes, and invalid limits with 400. Category filters use the same canonical values and validation as the directory: reject empty, unsupported or comma-packed values, accept at most 20 supplied values per category before deduplication, then deduplicate repeated values. Combine the prefix and different categories with AND; values within each category use OR. The frontend sends its applied category filters, not pending selections or the previous table search text.
 
-Order by lowercase full name, then internal employee ID ascending for deterministic ties. Limit rows in the query. No count query or database migration is required. Return a bare JSON array containing only public `employeeId` and `fullName`; do not include salary, email, category fields or internal keys. The frontend displays only the name and uses the public ID to open the profile.
+Match punctuation literally, including `%`, `_` and `!`; escape SQL pattern characters and bind all values. Search includes active and inactive records within the supplied filters. Employee-ID matching and paging parameters do not apply to this endpoint. Case-insensitive matching does not imply accent-insensitive matching.
+
+Apply filters before ordering and limiting. Order by lowercase full name, then internal employee ID ascending for deterministic ties. Limit rows in the query. No count query or database migration is required. Return a bare JSON array containing only public `employeeId` and `fullName`; do not include salary, email, category fields or internal keys. The frontend displays only the name and uses the public ID to open the profile.
 
 Success (`200`, shared response headers):
 

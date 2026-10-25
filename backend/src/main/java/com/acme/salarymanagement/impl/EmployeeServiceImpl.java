@@ -75,13 +75,22 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional(readOnly = true)
     public List<EmployeeSuggestion> suggestions(EmployeeSuggestionQuery query) {
         String literal = query.prefix().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        StringBuilder statement = new StringBuilder("""
+                SELECT e.employee_id, e.full_name FROM employee e
+                WHERE LOWER(e.full_name) LIKE ? ESCAPE '!'
+                """);
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(literal + "%");
+        for (var filter : query.filters().entrySet()) if (!filter.getValue().isEmpty()) {
+            statement.append(" AND ").append(FILTER_COLUMNS.get(filter.getKey())).append(" IN (")
+                    .append(String.join(",", Collections.nCopies(filter.getValue().size(), "?"))).append(")");
+            parameters.addAll(filter.getValue());
+        }
+        statement.append(" ORDER BY LOWER(e.full_name) ASC, e.id ASC FETCH FIRST ? ROWS ONLY");
+        parameters.add(query.limit());
         try {
-            return sql.query("""
-                    SELECT employee_id, full_name FROM employee
-                    WHERE LOWER(full_name) LIKE ? ESCAPE '!'
-                    ORDER BY LOWER(full_name) ASC, id ASC FETCH FIRST ? ROWS ONLY
-                    """, (row, index) -> new EmployeeSuggestion(row.getString("employee_id"), row.getString("full_name")),
-                    literal + "%", query.limit());
+            return sql.query(statement.toString(),
+                    (row, index) -> new EmployeeSuggestion(row.getString("employee_id"), row.getString("full_name")), parameters.toArray());
         } catch (DataAccessException exception) { throw unavailable(exception); }
     }
 

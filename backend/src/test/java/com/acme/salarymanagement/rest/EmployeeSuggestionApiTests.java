@@ -97,9 +97,76 @@ class EmployeeSuggestionApiTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
     }
 
+    @Test
+    void appliesEveryCategoryAndThePrefixBeforeLimitingSuggestions() throws Exception {
+        jdbc.update("UPDATE employee SET full_name='Other person'");
+        name(1, "R 01 country mismatch");
+        categories(1, "US", "Engineering", "L1", "INR");
+        name(2, "R 02 department mismatch");
+        categories(2, "IN", "Finance", "L1", "INR");
+        name(3, "R 03 level mismatch");
+        categories(3, "IN", "Engineering", "L2", "INR");
+        name(4, "R 04 currency mismatch");
+        categories(4, "IN", "Engineering", "L1", "USD");
+        name(11, "R 99 matching inactive");
+        categories(11, "IN", "Engineering", "L1", "INR");
+        name(12, "Arjun matching categories");
+        categories(12, "IN", "Engineering", "L1", "INR");
+
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("prefix", "R").queryParam("limit", "1")
+                        .queryParam("country", "IN").queryParam("department", "Engineering")
+                        .queryParam("jobLevel", "L1").queryParam("currency", "INR"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[*].employeeId", contains("EMP-000011")))
+                .andExpect(jsonPath("$[0]", aMapWithSize(2)));
+    }
+
+    @Test
+    void repeatedCategoryValuesUseOrWithoutDuplicatingSuggestions() throws Exception {
+        jdbc.update("UPDATE employee SET full_name='Other person'");
+        name(1, "Ravi Shah");
+        categories(1, "IN", "Engineering", "L1", "INR");
+        name(2, "Raquel Jones");
+        categories(2, "US", "Finance", "L2", "USD");
+        name(3, "Rohit Singh");
+        categories(3, "GB", "Engineering", "L1", "GBP");
+        name(11, "Rita Lee");
+        categories(11, "IN", "Finance", "L2", "USD");
+
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("prefix", "R")
+                        .queryParam("country", "IN", "US", "IN")
+                        .queryParam("department", "Engineering", "Finance", "Engineering")
+                        .queryParam("jobLevel", "L1", "L2").queryParam("currency", "INR", "USD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].employeeId", contains("EMP-000002", "EMP-000001", "EMP-000011")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"country=", "country=in", "country=XX", "country=IN,US",
+            "department=engineering", "department=Unlisted", "jobLevel=l1", "currency=inr"})
+    void rejectsNonCanonicalFilterValues(String query) throws Exception {
+        String[] pair = query.split("=", -1);
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("prefix", "R").queryParam(pair[0], pair[1]))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value(pair[0]))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("UNSUPPORTED_VALUE"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"country=IN", "department=Engineering", "jobLevel=L1", "currency=INR"})
+    void capsSuppliedValuesPerCategoryBeforeDeduplication(String query) throws Exception {
+        String[] pair = query.split("=", -1);
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("prefix", "R")
+                        .queryParam(pair[0], java.util.Collections.nCopies(20, pair[1]).toArray(String[]::new)))
+                .andExpect(status().isOk());
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("prefix", "R")
+                        .queryParam(pair[0], java.util.Collections.nCopies(21, pair[1]).toArray(String[]::new)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors[0].field").value(pair[0]))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("TOO_MANY_VALUES"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"prefix=", "prefix=   ", "limit=0", "limit=11", "limit=-1", "limit=1.5",
-            "limit=9999999999999999999999", "limit=", "q=R", "country=IN", "page=0", "sort=fullName,asc"})
+            "limit=9999999999999999999999", "limit=", "q=R", "futureFilter=true", "page=0", "sort=fullName,asc"})
     void rejectsInvalidOrUnknownParameters(String query) throws Exception {
         String[] pair = query.split("=", -1);
         var request = get(PATH).with(user(EMAIL).roles("HR"));
@@ -154,5 +221,10 @@ class EmployeeSuggestionApiTests {
 
     private void name(int number, String name) {
         jdbc.update("UPDATE employee SET full_name=? WHERE employee_id=?", name, "EMP-%06d".formatted(number));
+    }
+
+    private void categories(int number, String country, String department, String level, String currency) {
+        jdbc.update("UPDATE employee SET country_code=?, department=?, job_level=?, currency_code=? WHERE employee_id=?",
+                country, department, level, currency, "EMP-%06d".formatted(number));
     }
 }

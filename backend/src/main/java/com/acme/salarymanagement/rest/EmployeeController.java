@@ -66,7 +66,7 @@ public class EmployeeController {
         List<ApiFieldError> errors;
         try {
             authorize(request, user);
-            errors = suggestionValidator.validate(request);
+            errors = suggestionValidator.validate(request, references.referenceData());
             if (errors.isEmpty()) {
                 return ResponseEntity.ok(service.suggestions(suggestionValidator.query(request)));
             }

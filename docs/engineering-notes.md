@@ -224,5 +224,5 @@ Move the flat authentication classes into `rest`, `service`, `impl`, `bean`, `ut
 
 ### Workspace home link — 2026-10-26
 
-- Make the signed-in sidebar's ACME logo/name a normal link to Employees, the existing authenticated landing page. Preserve its appearance and existing directory state restoration.
+- Make the signed-in sidebar's ACME logo/name a normal link to Employees, the existing authenticated landing page. Preserve its appearance and existing directory state restoration. Suppress the brand's hover underline while retaining its keyboard focus indicator.
 - Two Playwright checks first failed for the missing link, then passed for desktop keyboard/click navigation and mobile navigation/menu closure. The production build and all four isolated live-API workflows passed after this change. Combined frontend coverage is 92 fixture/render/security checks plus four live workflows.

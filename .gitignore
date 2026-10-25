@@ -6,6 +6,7 @@ blob-report/
 .idea/
 *.iml
 **/target/
+frontend/dist/
 .env
 .env.*
 !.env.example

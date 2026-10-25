@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "dev": "vite --config vite.config.mjs",
+    "build": "vite build --config vite.config.mjs",
+    "test:unit": "node --test frontend/tests/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -10,6 +13,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@types/node": "^26.6.5"
+    "@types/node": "^26.6.5",
+    "vite": "8.3.5"
+  },
+  "dependencies": {
+    "@fontsource/roboto": "5.3.0",
+    "angular": "1.8.3",
+    "angular-animate": "1.8.3",
+    "angular-aria": "1.8.3",
+    "angular-material": "1.2.5",
+    "angular-messages": "1.8.3",
+    "angular-route": "1.8.3"
   }
 }

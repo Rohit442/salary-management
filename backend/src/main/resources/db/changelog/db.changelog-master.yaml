@@ -55,3 +55,5 @@ databaseChangeLog:
       file: db/changelog/010-seed-demo-hr-user.yaml
   - include:
       file: db/changelog/011-auth-account-identity.yaml
+  - include:
+      file: db/changelog/012-salary-public-identity.yaml

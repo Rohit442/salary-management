@@ -27,6 +27,7 @@ public class EmployeeWriteValidator {
             String employeeId, ReferenceDataResponse references) {
         Set<String> fields = switch (operation) {
             case "create" -> Set.of("employeeId","fullName","workEmail","countryCode","department","jobTitle","jobLevel","annualBaseSalary","currency","joiningDate","initialSalaryEffectiveFrom");
+            case "salary" -> Set.of("annualBaseSalary","reason","effectiveDate","version");
             case "details" -> Set.of("fullName","workEmail","countryCode","department","jobTitle","jobLevel","joiningDate","lastEmploymentDate","version");
             default -> Set.of("employmentStatus","version");
         };
@@ -70,9 +71,9 @@ public class EmployeeWriteValidator {
             supported.forEach((field,values)-> { if (body.has(field) && !values.contains(body.path(field).asText())) errors.add(error(field,"UNSUPPORTED_VALUE","Use a supported canonical value.")); });
         }
         if (operation.equals("status") && !body.path("employmentStatus").asText().equals("INACTIVE")) errors.add(error("employmentStatus","UNSUPPORTED_VALUE","Only INACTIVE is accepted."));
-        if (operation.equals("create") && body.path("annualBaseSalary").isTextual()) {
+        if ((operation.equals("create") || operation.equals("salary")) && body.path("annualBaseSalary").isTextual()) {
             String amount=body.path("annualBaseSalary").textValue();
-            int precision=references.currencies().stream().filter(c->c.code().equals(body.path("currency").asText())).mapToInt(ReferenceDataResponse.Currency::fractionDigits).findFirst().orElse(2);
+            int precision=references==null?4:references.currencies().stream().filter(c->c.code().equals(body.path("currency").asText())).mapToInt(ReferenceDataResponse.Currency::fractionDigits).findFirst().orElse(2);
             if (!amount.matches("[0-9]{1,15}(\\.[0-9]{1,"+precision+"})?")) errors.add(error("annualBaseSalary","INVALID_PRECISION","Use a plain decimal within the currency precision and amount range."));
             else if (new BigDecimal(amount).signum()<=0) errors.add(error("annualBaseSalary","POSITIVE_AMOUNT_REQUIRED","Salary must be positive."));
         }

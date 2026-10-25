@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-salary-public-identity
+      author: salary-management
+      changes:
+        - addColumn:
+            tableName: salary_change
+            columns:
+              - column:
+                  name: public_id
+                  type: VARCHAR(36)
+                  defaultValueComputed: RANDOM_UUID()
+                  constraints:
+                    nullable: false
+                    unique: true

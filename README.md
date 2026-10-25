@@ -1,5 +1,41 @@
 # ACME Salary Management
 
+## Quick start
+
+Install **Git, Java 21, and Node.js 26 with npm**. Java must be available on your PATH. Maven is included through the backend wrapper; no separate database installation or environment file is required for the default local setup.
+
+Clone the repository and install frontend dependencies:
+
+```sh
+git clone https://github.com/Rohit442/salary-management.git
+cd salary-management
+npm ci
+```
+
+In this terminal, start the backend:
+
+```sh
+cd backend
+./mvnw spring-boot:run
+```
+
+On Windows, use `mvnw.cmd spring-boot:run`. Wait for the backend to start on port **8080**. On the first run, it creates the H2 database and seeds 10,000 fictional employees. Data is saved locally and survives restarts.
+
+Open a second terminal in the cloned `salary-management` folder and start the frontend:
+
+```sh
+npm run dev
+```
+
+Keep both terminals running. Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and sign in with:
+
+| Field | Local demo value |
+|---|---|
+| Email | `maya.rao@acme.example` |
+| Password | `AcmeDev!2026` |
+
+Ports **8080** and **5173** must be available. The first startup downloads dependencies and may take longer. Playwright browser installation is needed only for browser tests; see [Frontend setup and verification](#frontend-setup-and-verification).
+
 ## Project status
 
 Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, all four JSON authentication APIs, the compensation-report and reference-data APIs, and all employee creation, detail, status, salary/history and monthly base-pay APIs. All 15 contracted backend APIs are implemented, including the separate employee name-suggestions lookup. GitHub Actions build/test automation is configured; non-demo HR provisioning and deployment remain pending.

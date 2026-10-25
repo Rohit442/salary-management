@@ -41,6 +41,10 @@ export type FixtureState = {
 function failure(code: string, message: string) {
   return { code, message, requestId: '00000000-0000-4000-8000-000000000001', fieldErrors: [] };
 }
+function matchesDirectoryFilters(record: typeof employee, query: URLSearchParams) {
+  const fields = { country: 'countryCode', department: 'department', jobLevel: 'jobLevel', currency: 'currency' } as const;
+  return Object.entries(fields).every(([key, property]) => !query.getAll(key).length || query.getAll(key).includes(record[property]));
+}
 async function json(route: Route, status: number, body?: unknown) {
   await route.fulfill({ status, ...(status === 204 ? {} : { contentType: 'application/json', body: JSON.stringify(body) }),
     headers: { 'Cache-Control': 'no-store', 'X-Request-ID': '00000000-0000-4000-8000-000000000001' } });
@@ -100,7 +104,7 @@ export async function fixtureApi(page: Page, initial: Partial<FixtureState> = {}
       if (state.suggestionsFailure) return json(route, 503, failure('SERVICE_UNAVAILABLE', 'Suggestions are temporarily unavailable.'));
       const limit = Number(url.searchParams.get('limit') || 8);
       const candidates = state.directoryRecords || Object.values(state.records);
-      return json(route, 200, candidates.filter(record => prefix && record.fullName.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase()))
+      return json(route, 200, candidates.filter(record => prefix && record.fullName.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase()) && matchesDirectoryFilters(record, url.searchParams))
         .sort((left, right) => left.fullName.localeCompare(right.fullName) || left.employeeId.localeCompare(right.employeeId))
         .slice(0, limit).map(({ employeeId, fullName }) => ({ employeeId, fullName })));
     }
@@ -110,9 +114,8 @@ export async function fixtureApi(page: Page, initial: Partial<FixtureState> = {}
       if (state.directoryRecords) {
         const q = (url.searchParams.get('q') || '').toLocaleLowerCase();
         const [field, direction] = (url.searchParams.get('sort') || 'fullName,asc').split(',');
-        const filterFields = { country: 'countryCode', department: 'department', jobLevel: 'jobLevel', currency: 'currency' } as const;
         const matching = state.directoryRecords.filter(record => (!q || record.fullName.toLocaleLowerCase().includes(q) || record.employeeId.toLocaleLowerCase().includes(q)) &&
-          Object.entries(filterFields).every(([key, property]) => !url.searchParams.getAll(key).length || url.searchParams.getAll(key).includes(record[property])))
+          matchesDirectoryFilters(record, url.searchParams))
           .sort((left, right) => (String(left[field as keyof typeof employee]).localeCompare(String(right[field as keyof typeof employee])) || left.employeeId.localeCompare(right.employeeId)) * (direction === 'desc' ? -1 : 1));
         const items = matching.slice(pageNumber * size, (pageNumber + 1) * size);
         const totalPages = Math.ceil(matching.length / size);

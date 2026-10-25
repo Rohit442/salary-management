@@ -66,6 +66,58 @@ test.describe('Employee directory interactions', () => {
     expect(state.requests.some(request => request.path === '/api/employees/EMP-006002')).toBe(true);
   });
 
+  test('name suggestions use all applied filters with OR within each category and AND across categories', async ({ page }) => {
+    const matchingNames = ['Alice Chen', 'Alice Rao', 'Alina Gomez', 'Alina Shah'];
+    const state = await loadDirectory(page, { directoryRecords: [
+      person(matchingNames[0], 31),
+      { ...person(matchingNames[1], 32), countryCode: 'US', department: 'Finance', jobLevel: 'L3', currency: 'USD' },
+      { ...person(matchingNames[2], 33), countryCode: 'US', jobLevel: 'L3' },
+      { ...person(matchingNames[3], 34), department: 'Finance', currency: 'USD' },
+      { ...person('Alice outside country', 35), countryCode: 'DE' },
+      { ...person('Alice outside department', 36), department: 'Design' },
+      { ...person('Alice outside level', 37), jobLevel: 'L6' },
+      { ...person('Alice outside currency', 38), currency: 'GBP' },
+    ] });
+    const filters: Array<[string, string[], string, string[]]> = [
+      ['Country', ['United States', 'India'], 'country', ['IN', 'US']],
+      ['Department', ['Finance', 'Engineering'], 'department', ['Engineering', 'Finance']],
+      ['Job level', ['L4', 'L3'], 'jobLevel', ['L3', 'L4']],
+      ['Currency', ['US dollar', 'Indian rupee'], 'currency', ['INR', 'USD']],
+    ];
+    for (const [label, options, key, values] of filters) {
+      await filterControl(page, label).click();
+      for (const option of options) await page.getByRole('option', { name: option, exact: true }).click();
+      await page.keyboard.press('Escape');
+      await expect(filterControl(page, label)).toBeFocused();
+      await leaveField(page);
+      await expect.poll(() => lastDirectory(state).query.getAll(key)).toEqual(values);
+    }
+    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(4);
+    const tableRequestsBeforeTyping = directoryRequests(state).length;
+    await search(page).fill('ali');
+    await expect.poll(() => suggestionRequests(state).length).toBe(1);
+    const query = suggestionRequests(state)[0].query;
+    expect(query.get('prefix')).toBe('ali');
+    expect(query.get('limit')).toBe('8');
+    for (const [, , key, values] of filters) expect(query.getAll(key)).toEqual(values);
+    await expect(suggestions(page).getByRole('option')).toHaveText(matchingNames);
+    await expect(suggestions(page)).not.toContainText('outside');
+    expect(directoryRequests(state)).toHaveLength(tableRequestsBeforeTyping);
+    expect(lastDirectory(state).query.has('q')).toBe(false);
+    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await expect(search(page)).toHaveValue('');
+    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(8);
+    await search(page).fill('ali');
+    await expect.poll(() => suggestionRequests(state).length).toBe(2);
+    const clearedQuery = suggestionRequests(state)[1].query;
+    for (const [, , key] of filters) expect(clearedQuery.getAll(key)).toEqual([]);
+    await expect(suggestions(page).getByRole('option')).toHaveCount(8);
+    for (const category of ['country', 'department', 'level', 'currency']) {
+      await expect(suggestions(page).getByRole('option', { name: `Alice outside ${category}`, exact: true })).toBeVisible();
+    }
+    expect(directoryRequests(state)).toHaveLength(tableRequestsBeforeTyping + 1);
+  });
+
   test('keyboard arrows select names, Escape dismisses suggestions and Enter opens the active employee', async ({ page }) => {
     const state = await loadDirectory(page);
     await search(page).fill('Ali');

@@ -158,7 +158,7 @@ function DirectoryController(api, $scope, $timeout, $location, directoryState) {
     const current = suggestionSequence;
     suggestionTimer = $timeout(async () => {
       try {
-        const suggestions = await api.get('/employees/suggestions', { prefix, limit: 8 });
+        const suggestions = await api.get('/employees/suggestions', { ...vm.appliedFilters, prefix, limit: 8 });
         if (alive() && current === suggestionSequence) vm.suggestions = suggestions;
       } catch {
         // Lookup failures leave the existing table and its search available.

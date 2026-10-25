@@ -30,7 +30,9 @@ public class AuthRequestValidator {
     public AuthRequestValidator(Validator beanValidator) { this.beanValidator = beanValidator; }
 
     public String allowedMethod(HttpServletRequest request) {
-        return METHODS.get(request.getRequestURI().substring(request.getContextPath().length()));
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        if (path.equals("/api/employees")) return "GET";
+        return path.matches("/api/employees/[^/]+") ? "GET" : METHODS.get(path);
     }
 
     public void validateProtocol(HttpServletRequest request, String path) {

@@ -83,17 +83,19 @@ class H2ConsoleSecurityTests {
     }
 
     @Test
-    void apiStillRequiresAuthenticationAndCsrf() throws Exception {
+    void employeeApiRequiresSessionAuthenticationAndCsrf() throws Exception {
         var anonymous = client.send(request("/api/employees", false).header("Accept", "application/json")
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(anonymous.statusCode()).isEqualTo(401);
         var authenticated = client.send(request("/api/employees", true).GET().build(), HttpResponse.BodyHandlers.ofString());
-        assertThat(authenticated.statusCode()).isEqualTo(404);
+        // Basic credentials remain available for the local console; employee APIs require the login session.
+        assertThat(authenticated.statusCode()).isEqualTo(401);
+        assertThat(authenticated.body()).contains("AUTHENTICATION_REQUIRED");
         assertThat(authenticated.headers().firstValue("X-Frame-Options")).contains("DENY");
         var unsafe = client.send(request("/api/employees", true).POST(HttpRequest.BodyPublishers.noBody()).build(),
                 HttpResponse.BodyHandlers.ofString());
-        // A protected /error redispatch can return 401 after the CSRF rejection.
-        assertThat(unsafe.statusCode()).isIn(401, 403);
+        assertThat(unsafe.statusCode()).isEqualTo(403);
+        assertThat(unsafe.body()).contains("CSRF_INVALID");
     }
 
     private HttpRequest.Builder request(String path, boolean authenticated) {

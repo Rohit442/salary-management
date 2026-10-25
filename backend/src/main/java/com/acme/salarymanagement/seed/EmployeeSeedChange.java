@@ -16,9 +16,9 @@ import net.datafaker.Faker;
 
 /** Liquibase owns execution, connection lifecycle, transaction and applied-change tracking. */
 public class EmployeeSeedChange implements CustomSqlChange {
-    private static final String[] COUNTRIES = {"IN", "US", "GB", "DE", "SG"};
+    private static final String[] COUNTRIES = com.acme.salarymanagement.config.ReferenceVocabulary.SEED_COUNTRIES.toArray(String[]::new);
     private static final String[] CURRENCIES = {"INR", "USD", "GBP", "EUR", "SGD"};
-    private static final String[] DEPARTMENTS = {"Engineering", "Product", "Design", "Finance", "Operations", "HR"};
+    private static final String[] DEPARTMENTS = com.acme.salarymanagement.config.ReferenceVocabulary.SEED_DEPARTMENTS.toArray(String[]::new);
     private static final String[] TITLES = {"Software Engineer", "Product Manager", "Designer", "Financial Analyst", "Operations Analyst", "HR Specialist"};
     private static final long[] SALARY_FLOORS = {400000, 40000, 30000, 35000, 45000};
     private static final LocalDate REFERENCE_DATE = LocalDate.of(2026, 1, 1);

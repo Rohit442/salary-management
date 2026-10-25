@@ -23,7 +23,8 @@ public class AuthRequestValidator {
     private static final int MAX_BODY_BYTES = 4096;
     private static final Map<String, String> METHODS = Map.of(
             "/api/auth/csrf", "GET", "/api/auth/me", "GET",
-            "/api/auth/login", "POST", "/api/auth/logout", "POST");
+            "/api/auth/login", "POST", "/api/auth/logout", "POST",
+            "/api/reports/compensation", "GET", "/api/reference-data", "GET");
     private final Validator beanValidator;
 
     public AuthRequestValidator(Validator beanValidator) { this.beanValidator = beanValidator; }
@@ -33,8 +34,8 @@ public class AuthRequestValidator {
     }
 
     public void validateProtocol(HttpServletRequest request, String path) {
-        String method = METHODS.get(path);
-        if (method != null && !method.equals(request.getMethod())) {
+        String method = allowedMethod(request);
+        if (method != null && !java.util.Arrays.asList(method.split(", ")).contains(request.getMethod())) {
             throw invalid(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "This HTTP method is not supported.");
         }
         String accept = request.getHeader("Accept");

@@ -49,10 +49,10 @@ X-Request-ID: 01362e7b-c0da-4395-a723-419959442bb9
   ],
   "currencies": [
     {"code": "EUR", "label": "Euro", "fractionDigits": 2},
-    {"code": "GBP", "label": "Pound sterling", "fractionDigits": 2},
-    {"code": "INR", "label": "Indian rupee", "fractionDigits": 2},
-    {"code": "SGD", "label": "Singapore dollar", "fractionDigits": 2},
-    {"code": "USD", "label": "US dollar", "fractionDigits": 2}
+    {"code": "GBP", "label": "Pound Sterling", "fractionDigits": 2},
+    {"code": "INR", "label": "Indian Rupee", "fractionDigits": 2},
+    {"code": "SGD", "label": "Singapore Dollar", "fractionDigits": 2},
+    {"code": "USD", "label": "US Dollar", "fractionDigits": 2}
   ]
 }
 ```

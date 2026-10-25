@@ -39,7 +39,7 @@ public class AuthExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public void methodNotAllowed(HttpRequestMethodNotSupportedException exception,
             HttpServletRequest request, HttpServletResponse response) throws Exception {
-        if (!isAuthApi(request)) {
+        if (!isApi(request)) {
             throw exception;
         }
         if (exception.getSupportedHttpMethods() != null) {
@@ -52,13 +52,13 @@ public class AuthExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     public void unacceptableResponse(HttpMediaTypeNotAcceptableException exception,
             HttpServletRequest request, HttpServletResponse response) throws Exception {
-        if (!isAuthApi(request)) {
+        if (!isApi(request)) {
             throw exception;
         }
         responses.error(request, response, 406, "NOT_ACCEPTABLE", "This endpoint returns JSON.", List.of());
     }
 
-    private boolean isAuthApi(HttpServletRequest request) {
-        return request.getRequestURI().startsWith(request.getContextPath() + "/api/auth/");
+    private boolean isApi(HttpServletRequest request) {
+        return request.getRequestURI().startsWith(request.getContextPath() + "/api/");
     }
 }

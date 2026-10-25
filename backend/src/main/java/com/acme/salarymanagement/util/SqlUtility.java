@@ -1,5 +1,6 @@
 package com.acme.salarymanagement.util;
 
+import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,10 @@ public class SqlUtility {
 
     public SqlUtility(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public <T> List<T> query(String sql, RowMapper<T> mapper, Object... parameters) {
+        return jdbc.query(sql, mapper, parameters);
     }
 
     public <T> T queryOne(String sql, RowMapper<T> mapper, Object... parameters) {

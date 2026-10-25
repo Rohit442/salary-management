@@ -57,11 +57,12 @@ public class SecurityConfiguration {
         var handlers = new ApiAuthenticationHandlers(service, attempts, responses, sessions);
         var provider = new ApiAuthenticationProvider(users, encoder);
         return http
-                .securityMatcher("/api/auth/**")
+                .securityMatcher("/api/auth/**", "/api/reports/**", "/api/reference-data")
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/auth/**").authenticated()
+                        .anyRequest().hasRole("HR"))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(new HttpSessionCsrfTokenRepository())
                         .csrfTokenRequestHandler(new ApiCsrfTokenRequestHandler()))

@@ -56,14 +56,14 @@ public class ApiResponseWriter {
 
     public void failure(HttpServletRequest request, HttpServletResponse response, ApiRequestException exception) throws IOException {
         if (exception.status().is5xxServerError() && exception.getCause() != null) {
-            LOGGER.error("Authentication API dependency failed; requestId={}", prepare(request, response), exception.getCause());
+            LOGGER.error("API dependency failed; requestId={}", prepare(request, response), exception.getCause());
         }
         error(request, response, exception.status().value(), exception.code(), exception.getMessage(), exception.fieldErrors());
     }
 
     public void unexpected(HttpServletRequest request, HttpServletResponse response, Exception exception) throws IOException {
         String id = prepare(request, response);
-        LOGGER.error("Authentication API failed; requestId={}", id, exception);
+        LOGGER.error("API failed; requestId={}", id, exception);
         error(request, response, 500, "INTERNAL_ERROR", "Unable to complete the request.", List.of());
     }
 }

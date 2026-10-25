@@ -127,6 +127,7 @@ erDiagram
     }
     SALARY_CHANGE {
         number id PK
+        varchar public_id UK
         number employee_fk FK
         number actor_fk FK
         varchar actor_display_name

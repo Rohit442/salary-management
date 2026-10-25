@@ -2,9 +2,11 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, and all four JSON authentication APIs. Added compensation reporting and reference data, employee directory/detail reads, validated employee creation and versioned details/status writes, atomic salary updates, replay handling and salary history, monthly base-pay estimates. Non-demo HR provisioning, CI and deployment remain pending.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, all four JSON authentication APIs, the compensation-report and reference-data APIs, and all employee creation, detail, status, salary/history and monthly base-pay APIs. All 14 contracted backend APIs are implemented. Non-demo HR provisioning, CI and deployment remain pending.
 
-The latest local Maven `clean verify` passed **170 tests with zero failures/errors/skips** and packaged the backend. This includes all 29 original auth contract cases and eight real HTTP cases. Test databases and random-port servers are isolated from your running application on port 8080.
+The latest local Maven `clean verify` passed **171 tests with zero failures/errors/skips** and packaged the backend. This includes employee writes, salary replay/history, monthly estimates, real concurrent transactions and a complete HTTP business workflow, alongside the existing authentication, directory and report checks. Test databases and random-port servers are isolated from your running application on port 8080.
+
+The AngularJS frontend now implements all eight Figma pages with responsive layouts. Sign-in, employee directory/details, reference options and compensation reports are verified against the real APIs. Employee write, history and estimate screens use the contracted routes, which are now implemented. The previously recorded live frontend verification covered authentication and read workflows. Frontend verification: **29 unit tests and 42 Chromium Playwright checks passed**, including one live-API workflow; the production asset build passes.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -56,7 +58,7 @@ On Windows, use `mvnw.cmd` in place of `./mvnw`.
 
 ## Authentication APIs and tests
 
-Import [the Postman collection](docs/postman/acme-auth.postman_collection.json), keep cookies enabled, and run requests 01–05 in order. It includes the local demo variables and saves/refreshes the CSRF token automatically.
+Import [the Postman collection](docs/postman/acme-auth.postman_collection.json), keep cookies enabled, and run requests 01–03 to sign in. The collection includes all 14 contracted APIs across 15 requests, with logout last (15). Requests 09–14 demonstrate the employee creation, editing, salary/history, estimate and inactivation workflow. It includes the local demo variables and saves/refreshes the CSRF token automatically.
 
 | Method | Path | Result |
 |---|---|---|
@@ -79,6 +81,37 @@ The contract suite checks all four routes, JSON errors, validation, CSRF/session
 
 Configuration: `AUTH_IDLE_TIMEOUT_SECONDS` (1800), `AUTH_MAXIMUM_FAILURES` (5), `AUTH_ATTEMPT_WINDOW_SECONDS` (900), and `SESSION_COOKIE_SECURE` (false locally; true for HTTPS deployment). Client IP comes from the servlet container; arbitrary forwarded headers are not read by the limiter.
 
+## Dashboard APIs
+
+After signing in, use the same session cookie for these GET requests; no CSRF header is needed:
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/api/reference-data` | Country, department, level and currency filter options |
+| GET | `/api/reports/compensation` | Active employee count and annual base salary totals, averages and medians per currency |
+
+Optional repeated report filters: `country`, `department`, `jobLevel`, `currency`. Repeat `groupBy` for `country`, `department` and/or `jobLevel`; currency is always included. For example: `/api/reports/compensation?country=IN&jobLevel=L4&groupBy=department`.
+
+Restart the backend to load these routes. Full request/response and curl examples are in the [report contract](docs/api-reports.md) and [reference-data contract](docs/api-reference-data.md). Run dashboard checks with `./mvnw -Dtest=DashboardApiTests,DashboardFailureTests test` from `backend/`.
+
+## Employee read APIs
+
+- `GET /api/employees`: paginated directory with literal name/ID search, canonical filters and supported sorting; includes active and inactive employees.
+- `GET /api/employees/{employeeId}`: complete employee record, including the current version. Invalid IDs return 400; missing valid IDs return 404.
+
+Both use the authenticated HR session without CSRF for GET. Restart the backend after code changes. The [employee contract](docs/api-employees.md#5-get-apiemployees) includes query rules and curl examples. Postman requests 07–08 cover these endpoints before logout.
+
+## Employee writes, salary history and monthly estimates
+
+- `POST /api/employees`: create an employee and immutable initial salary baseline; returns 201 and Location.
+- `PUT /api/employees/{employeeId}/details`: replace editable details with a reviewed version.
+- `PUT /api/employees/{employeeId}/status`: set inactive with a reviewed version.
+- `POST /api/employees/{employeeId}/salary-changes`: record a salary change using CSRF, version and a stable Idempotency-Key.
+- `GET /api/employees/{employeeId}/salary-changes`: paginated immutable salary history.
+- `GET /api/employees/{employeeId}/base-pay-estimate?month=YYYY-MM`: monthly base pay using whole-month salary changes and inclusive employment dates.
+
+Restart the backend to load the new routes and Liquibase migration 012. Existing records are retained. Postman requests 09–14 exercise these operations with a separate managed employee. Refresh the CSRF token after signing in and review versions before edits. Reuse the captured salary payload/key for an uncertain retry.
+
 ## Project documentation
 
 - [Requirements](docs/requirements.md) and [detailed business rules](docs/requirements-rules.md)
@@ -95,32 +128,34 @@ Configuration: `AUTH_IDLE_TIMEOUT_SECONDS` (1800), `AUTH_MAXIMUM_FAILURES` (5), 
 - [H2 database setup and decision](docs/database-h2.md)
 - [Figma screens and design handoff](docs/design/figma-ui.md)
 
-## Requirements
+## Frontend setup and verification
 
-Node.js 26 and npm.
-
-## Install
+Use Node.js 26 and npm. AngularJS 1.8.3, Angular Material 1.2.5, Vite and Roboto are pinned and built locally; runtime assets do not depend on a CDN.
 
 ```sh
 npm ci
-npx playwright install
+npx playwright install chromium
+npm run dev
 ```
 
-## Browser tests
+Open http://127.0.0.1:5173. Start the current backend build on port 8080 first; the development server forwards `/api` to it. To target another local backend, set `ACME_API_URL`, for example `ACME_API_URL=http://127.0.0.1:18081 npm run dev`. Use the demo HR credentials documented above. Authentication and CSRF state remain in memory; the browser owns the HttpOnly session cookie.
 
 ```sh
-npm run test:e2e
-npm run test:e2e:ui
-npm run test:e2e:headed
-npm run test:e2e:report
+npm run test:unit
+npm run test:frontend
+npm run build
 ```
 
-Tests run in Chromium, Firefox, and WebKit. To run Chromium only:
+The frontend Playwright configuration starts Vite automatically when needed. Its 41 Chromium checks include 19 workflow checks, three keyboard/session/mobile checks, 16 desktop/mobile rendering checks and three resource-URL security checks. Workflow data uses isolated contract fixtures. They cover all eight pages, errors, conflicts and uncertain retries, but do not prove backend persistence. Rendering checks capture screenshots for manual comparison, not pixel-diff baselines. Screenshots and reports are ignored by Git.
+
+After building the latest backend JAR with the backend's `./mvnw clean verify` command, run:
 
 ```sh
-npm run test:e2e -- --project=chromium
+npm run test:frontend:live
 ```
 
-The starter test checks browser rendering and input without a network connection. During application implementation, configure Playwright's `webServer` and `baseURL` and add employee-search, salary-update, and authorization tests.
+This requires Java 21+ on PATH and free ports 18080 and 5174. Playwright starts and stops separate backend/frontend processes and a temporary H2 database with 20 employees. The check verifies actual sign-in, employee search/details, reports and country filters, session restoration, and logout. It does not touch the persistent database or the backend on port 8080.
 
-Official documentation: https://playwright.dev/docs/intro
+`npm run test:e2e` includes the starter and frontend fixture checks across Chromium, Firefox and WebKit; install those browsers first with `npx playwright install`. Only Chromium execution is recorded for this frontend increment. `npm run test:e2e:report` opens the latest HTML report.
+
+`npm run build` writes `frontend/dist`. Production hosting still needs static assets served anonymously with same-origin `/api` forwarding; the build is not copied into the Spring JAR. AngularJS/Angular Material are the adopted legacy stack, with their support limitation recorded in [engineering notes](docs/engineering-notes.md). The dependency audit flags two affected packages: AngularJS (high, ten underlying advisories) and Angular Material (moderate, inherited through AngularJS). Vite also reports a JavaScript chunk over 500 kB. These dependency and bundle findings remain unresolved. The application now rejects untrusted Angular resource URLs with an empty trusted-resource list; this hardens its template/resource loading without patching AngularJS or clearing the advisory. See the [resource-URL mitigation evidence](docs/engineering-notes.md#angularjs-resource-url-policy--2026-10-26).

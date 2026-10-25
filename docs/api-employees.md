@@ -149,7 +149,7 @@ BASE_URL='http://localhost:8080'
 COOKIE_JAR='./acme-auth.cookies'
 ```
 
-The file must already contain an authenticated HR session; the setup above alone does not sign in. `CSRF_TOKEN` must be the refreshed token for that session. Curl examples below are templates for the future server. The pre-existing-record examples use the fixture `EMP-004218`; creation uses `EMP-010001` and is independent of those edit examples.
+The file must already contain an authenticated HR session; the setup above alone does not sign in. `CSRF_TOKEN` must be the refreshed token for that session. All five employee endpoints are implemented. The pre-existing-record examples use the fixture `EMP-004218`; creation uses `EMP-010001` and is independent of those edit examples.
 
 ## 5. GET /api/employees
 

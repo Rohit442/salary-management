@@ -119,10 +119,17 @@ public class SalaryServiceImpl implements SalaryService {
     public SalaryHistoryPage history(String id,int page,int size) {
         try {
             Employee employee=employee(id,false);
+            var initialSalary=sql.queryOne("""
+                    SELECT e.created_at,e.created_by_display_name,a.public_id
+                    FROM employee e JOIN hr_user a ON a.id=e.created_by_fk WHERE e.id=?
+                    """,(row,index)->new SalaryHistoryPage.InitialSalary(
+                    money(employee.initialSalary(),employee.precision()),employee.currency(),employee.initialEffective(),
+                    row.getObject("created_at",OffsetDateTime.class).toInstant(),
+                    new SalaryChangeResponse.Actor(row.getString("public_id"),row.getString("created_by_display_name"))),employee.id());
             long total=sql.queryOne("SELECT COUNT(*) FROM salary_change WHERE employee_fk=?",(row,index)->row.getLong(1),employee.id());
             var items=sql.query(CHANGES+" WHERE s.employee_fk=? ORDER BY s.changed_at DESC,s.id DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",this::change,employee.id(),(long)page*size,size);
             long pages=(total+size-1)/size;
-            return new SalaryHistoryPage(id,items,page,size,items.size(),total,pages,new EmployeePage.Sort("changedAt","desc"),page>0,page+1L<pages);
+            return new SalaryHistoryPage(id,items,page,size,items.size(),total,pages,new EmployeePage.Sort("changedAt","desc"),page>0,page+1L<pages,initialSalary);
         } catch(DataAccessException exception) { throw unavailable(exception); }
     }
     @Override

@@ -134,3 +134,45 @@ test('live suggestions respect all applied directory filters', async ({ page }) 
   expect(matches).toEqual(expected.map(({ employeeId, fullName }: typeof target) => ({ employeeId, fullName })));
   await expect(page.getByRole('listbox', { name: 'Employee suggestions' }).getByRole('option')).toHaveText(expected.map((record: typeof target) => record.fullName));
 });
+
+test('live salary history shows the immutable initial salary before and after a salary change', async ({ page }) => {
+  await page.goto('/#!/sign-in');
+  await page.getByLabel('Work email', { exact: true }).fill('maya.rao@acme.example');
+  await page.getByLabel('Password', { exact: true }).fill('AcmeDev!2026');
+  const directoryResponse = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/employees');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const directory = await (await directoryResponse).json();
+  const employee = directory.items.find((record: { employmentStatus: string }) => record.employmentStatus === 'ACTIVE');
+  await page.getByRole('link', { name: employee.fullName, exact: true }).click();
+  const firstHistoryResponse = page.waitForResponse(reply => new URL(reply.url()).pathname === `/api/employees/${employee.employeeId}/salary-changes`);
+  await page.getByRole('link', { name: /View salary history/ }).click();
+  const firstHistory = await (await firstHistoryResponse).json();
+  const baseline = page.locator('.history-baseline');
+  await expect(baseline.locator('strong')).toHaveText(`${formatMoney(employee.annualBaseSalary, employee.currency)} / year`);
+  expect(firstHistory.initialSalary).toEqual({
+    annualBaseSalary: employee.annualBaseSalary, currency: employee.currency,
+    effectiveDate: employee.initialSalaryEffectiveFrom, recordedAt: employee.createdAt,
+    actor: { id: expect.any(String), displayName: 'Demo Data Seed' },
+  });
+  await expect(baseline).toContainText('Actor: Demo Data Seed');
+  await expect(baseline).not.toContainText('Effective from —');
+  await expect(baseline).not.toContainText('Recorded —');
+  await expect(page.getByText('No salary changes recorded. The initial salary is preserved above.', { exact: true })).toBeVisible();
+
+  await page.getByRole('link', { name: /Employee details/ }).click();
+  await page.getByRole('link', { name: 'Update salary', exact: true }).click();
+  const [whole, fraction] = employee.annualBaseSalary.split('.');
+  const newAmount = `${BigInt(whole) + 100n}.${fraction}`;
+  await page.getByRole('textbox', { name: 'Annual base salary', exact: true }).fill(newAmount);
+  await page.getByRole('textbox', { name: 'Reason for change', exact: true }).fill('Baseline preservation check');
+  await page.getByRole('textbox', { name: 'Effective from', exact: true }).fill(new Date().toISOString().slice(0, 10));
+  await page.getByRole('button', { name: 'Save salary', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Employee details', exact: true })).toBeVisible();
+  const nextHistoryResponse = page.waitForResponse(reply => new URL(reply.url()).pathname === `/api/employees/${employee.employeeId}/salary-changes`);
+  await page.getByRole('link', { name: /View salary history/ }).click();
+  const nextHistory = await (await nextHistoryResponse).json();
+  expect(nextHistory.initialSalary).toEqual(firstHistory.initialSalary);
+  await expect(baseline.locator('strong')).toHaveText(`${formatMoney(employee.annualBaseSalary, employee.currency)} / year`);
+  await expect(page.locator('.history-summary .salary-value')).toHaveText(formatMoney(newAmount, employee.currency));
+  await expect(page.getByRole('row').filter({ hasText: 'Baseline preservation check' })).toContainText(formatMoney(newAmount, employee.currency));
+});

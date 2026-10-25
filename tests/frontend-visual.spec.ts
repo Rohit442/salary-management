@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { fixtureApi, open } from './frontend-fixtures';
 
-// These are rendering/regression checks, with screenshots for manual design review.
-// Contract fixtures intentionally allow reviewing screens whose APIs are still pending.
+// Committed Chromium baselines use macOS, matching the visual CI runner.
+// Other browsers retain structural rendering checks and review screenshots.
 const screens = [
   ['sign-in', '/sign-in', 'Sign in to ACME'],
   ['directory', '/employees', 'Employee directory'],
@@ -30,6 +30,11 @@ for (const width of [1440, 390]) {
           .map(element => `${element.tagName}.${element.className}`).slice(0, 12) }));
       expect(dimensions.width, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.viewport);
       expect(errors).toEqual([]);
+      if (testInfo.project.name === 'chromium') {
+        await expect(page).toHaveScreenshot(`${name}-${width}.png`, {
+          animations: 'disabled', caret: 'hide', fullPage: true, maxDiffPixelRatio: 0.01,
+        });
+      }
       await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), fullPage: true });
     });
   }

@@ -213,6 +213,45 @@ test.describe('Frontend workflows with isolated contract fixtures', () => {
     await expect(page.getByText('INR 1,250,000.50', { exact: true })).toBeVisible();
   });
 
+  test('invalid employee IDs show ID guidance and can be corrected without changing valid dates', async ({ page }, testInfo) => {
+    const state = await fixtureApi(page);
+    await open(page, '/employees/new');
+    await expect(page.getByRole('heading', { name: 'Add employee', exact: true })).toBeVisible();
+    const employeeId = page.getByRole('textbox', { name: 'Employee ID', exact: true });
+    const idField = employeeId.locator('..');
+    await expect(idField.locator('.field-error')).toBeEmpty();
+    await expect(employeeId).toHaveAttribute('aria-invalid', 'false');
+    await employeeId.focus();
+    await employeeId.press('Tab');
+    await expect(idField.locator('.field-error')).toHaveText('Enter an employee ID.');
+    for (const [label, value] of [
+      ['Full name', 'Alex Morgan'], ['Work email', 'alex.morgan@acme.example'],
+      ['Job title', 'Software Engineer'], ['Annual base salary', '1250000.50'], ['Joining date', '2026-09-01'],
+    ]) await page.getByRole('textbox', { name: label, exact: true }).fill(value);
+    for (const [label, value] of [['Country', 'India'], ['Department', 'Engineering'], ['Job level', 'L3'], ['Currency', 'INR — Indian rupee']]) {
+      await page.getByRole('combobox', { name: label, exact: true }).selectOption({ label: value });
+    }
+    for (const value of ['EMP-09999', '2026-10-26']) {
+      await employeeId.fill(value);
+      await page.getByRole('button', { name: 'Save employee', exact: true }).click();
+      await expect(page.getByRole('alert')).not.toContainText('YYYY-MM-DD');
+      await expect(idField.locator('.field-error')).toHaveText('Use EMP- followed by exactly six digits, for example EMP-010001.');
+      await expect(employeeId).toHaveAttribute('aria-invalid', 'true');
+      expect(state.requests.filter(request => request.path === '/api/employees' && request.method === 'POST')).toHaveLength(0);
+    }
+    await page.screenshot({ path: testInfo.outputPath('employee-id-validation.png') });
+    await employeeId.fill('EMP-009999');
+    await expect(idField.locator('.field-error')).toBeEmpty();
+    await expect(employeeId).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.getByRole('textbox', { name: 'Joining date', exact: true })).toHaveValue('2026-09-01');
+    await expect(page.getByRole('textbox', { name: 'Initial salary effective from', exact: true })).toHaveValue('2026-09-01');
+    await page.getByRole('button', { name: 'Save employee', exact: true }).click();
+    await expect(page.getByText('Employee created successfully.', { exact: true })).toBeVisible();
+    const writes = state.requests.filter(request => request.path === '/api/employees' && request.method === 'POST');
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0].body!).employeeId).toBe('EMP-009999');
+  });
+
   test('editing employee details preserves identity and compensation while sending the reviewed version', async ({ page }) => {
     const state = await fixtureApi(page);
     await open(page, '/employees/EMP-004218/edit');

@@ -69,6 +69,36 @@ class BasePayApiTests {
     void rejectsInvalidMonths(String month) throws Exception {
         mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month",month)).andExpect(status().isBadRequest());
     }
+    @ParameterizedTest
+    @CsvSource({
+        "2024-02,2024-02-01,2024-02-29,29,29,100000.00",
+        "2024-02,2024-02-29,2024-02-29,29,1,3448.28",
+        "2025-02,2025-02-28,2025-02-28,28,1,3571.43",
+        "2026-04,2026-04-30,2026-04-30,30,1,3333.33",
+        "2026-01,2026-01-31,2026-01-31,31,1,3225.81"
+    })
+    void proratesCalendarBoundariesInclusively(String month,String joining,String leaving,int monthDays,int eligible,String amount) throws Exception {
+        jdbc.update("DELETE FROM salary_change WHERE employee_fk=(SELECT id FROM employee WHERE employee_id='EMP-000001')");
+        jdbc.update("UPDATE employee SET joining_date=?,last_employment_date=?,initial_salary_effective_from=?,salary_effective_from=?,annual_base_salary=1200000 WHERE employee_id='EMP-000001'",
+                joining,leaving,joining,joining);
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month",month))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.daysInMonth").value(monthDays))
+                .andExpect(jsonPath("$.eligibleDays").value(eligible))
+                .andExpect(jsonPath("$.estimatedBasePay").value(amount));
+    }
+    @Test void backdatedSaveRecalculatesItsMonthWithoutChangingEarlierMonths() throws Exception {
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month","2026-10"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.estimatedBasePay").value("150000.00"));
+        mvc.perform(post(ROOT+"/salary-changes").with(user(EMAIL).roles("HR")).with(csrf().asHeader())
+                .header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"annualBaseSalary\":\"2400000\",\"reason\":\"Backdated review\",\"effectiveDate\":\"2026-10-20\",\"version\":1}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month","2026-10"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.estimatedBasePay").value("200000.00"))
+                .andExpect(jsonPath("$.employeeVersion").value(2));
+        mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month","2026-09"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.estimatedBasePay").value("100000.00"));
+    }
     @Test void validatesMissingRepeatedUnknownParametersAndAuthorization() throws Exception {
         mvc.perform(get(PATH).with(user(EMAIL).roles("HR"))).andExpect(status().isBadRequest());
         mvc.perform(get(PATH).with(user(EMAIL).roles("HR")).queryParam("month","2026-01","2026-02")).andExpect(status().isBadRequest());

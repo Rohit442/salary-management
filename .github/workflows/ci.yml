@@ -1,0 +1,75 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Match the committed Chromium screenshot baselines' platform.
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26.9.0'
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Verify backend and coverage thresholds
+        working-directory: backend
+        run: ./mvnw -B --no-transfer-progress clean verify
+      - name: Verify frontend units and coverage thresholds
+        run: npm run test:coverage | tee frontend-coverage.txt
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify browser workflows and visual baselines
+        run: npx playwright test --config=playwright.frontend.config.ts
+      - name: Verify workflows against the isolated backend
+        run: npm run test:frontend:live
+      - name: Build production frontend
+        run: npm run build
+      - name: Retain test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: test-and-coverage-reports
+          retention-days: 14
+          path: |
+            backend/target/surefire-reports/
+            backend/target/site/jacoco/
+            frontend-coverage.txt
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+      - name: Retain verified application builds
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: salary-management-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            backend/target/salary-management-0.0.1-SNAPSHOT.jar
+            frontend/dist/

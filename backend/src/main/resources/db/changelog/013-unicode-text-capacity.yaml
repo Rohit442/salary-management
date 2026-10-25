@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-unicode-text-capacity
+      author: salary-management
+      # H2 VARCHAR lengths count UTF-16 code units. Each accepted Unicode code point
+      # can require two units; API limits remain 200 for name/title and 1000 for reason.
+      changes:
+        - modifyDataType:
+            tableName: employee
+            columnName: full_name
+            newDataType: VARCHAR(400)
+        - modifyDataType:
+            tableName: employee
+            columnName: job_title
+            newDataType: VARCHAR(400)
+        - modifyDataType:
+            tableName: salary_change
+            columnName: reason
+            newDataType: VARCHAR(2000)

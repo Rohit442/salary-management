@@ -68,7 +68,11 @@ For monthly base pay, use annual INR 1,200,000 from April 1, 2026, raised to INR
 
 ## Continuous integration and reproducibility
 
-Configure a pipeline after the application build exists. A clean checkout must use pinned tools, the Maven Wrapper, frontend lockfiles, versioned migrations, and isolated fixtures. Run fast unit/HTTP checks early, then H2 integration and essential browser checks before release. Publish failures and suite durations. Keep credentials out of source and logs.
+The GitHub Actions workflow `.github/workflows/ci.yml` runs on pushes, pull requests and manual dispatch. It uses Java 21, Node 26.9.0, the Maven Wrapper, `npm ci`, versioned migrations and isolated fixtures. It verifies backend tests/coverage, frontend unit coverage, Chromium/Firefox/WebKit workflows, Chromium visual comparisons and live backend browser workflows before building and retaining the application artifacts. It retains test reports on failure, uses read-only repository permissions, and does not deploy.
+
+JaCoCo checks at least 80% backend line coverage and 70% branch coverage during `verify`; HTML/XML/CSV reports are in `backend/target/site/jacoco/`. Native Node coverage checks at least 95% lines, 85% branches and 85% functions for frontend API, formatting and validation modules, including unloaded modules in those directories. This frontend percentage excludes Angular page controllers, templates and styles; browser tests cover their observable behavior. CI saves the frontend coverage text alongside the reports.
+
+Browser retries are disabled locally and in CI. The macOS 15 runner matches the committed Chromium screenshot baseline platform. Sixteen comparisons cover eight screens at 1440px and 390px widths, with animations disabled and a 1% differing-pixel tolerance. Firefox/WebKit also run structural rendering checks. Review intended visual changes before regenerating baselines with `npx playwright test --config=playwright.frontend.config.ts --project=chromium tests/frontend-visual.spec.ts --update-snapshots` on macOS; commit the PNGs with the test change. GitHub-hosted execution remains unverified until this workflow is pushed and run.
 
 Maintain fast feedback and investigate slow suites. Do not hide failures behind unconditional retries or label a flaky test healthy because a rerun passed. Record any environment-blocked check as blocked, with its reason; it is not a pass. Add verified test commands to the README during implementation.
 
@@ -184,3 +188,32 @@ The current JSON auth implementation is complete for the four documented routes.
 The final local `mvn -B clean verify` used IntelliJ's bundled Maven/JDK, the Java 21 target, isolated H2 fixtures and random-port embedded HTTP servers. Result: **81 tests, zero failures/errors/skips; BUILD SUCCESS**, including all 29 original contract cases, nine CSRF checks, five password/limiter cases and eight additional real HTTP cases. The remaining cases are the existing regressions. The packaged application was produced; no commit was made.
 
 HTTP coverage verifies the complete CSRF/login/refresh/me/logout flow, real session-cookie creation/rotation/deletion, local HttpOnly/SameSite flags, rejection of stale cookies/tokens, validation before logout cleanup, raw malformed/duplicate fields, and declared/chunked body bounds. Limiter expiry/rounding/pair isolation uses an injected clock without sleeps. Actual timed servlet expiry and an HTTPS deployment were not exercised by this run; the configured timeout and production cookie setting remain explicit.
+
+
+## Frontend input validation coverage — 26 October 2026
+
+The default frontend suite includes validation coverage for every input-bearing flow. Fixture tests check browser feedback, blocked invalid requests, preserved drafts, valid corrections and outgoing values; they do not prove backend acceptance or persistence. The separate live suite starts its own backend with a disposable in-memory H2 database.
+
+| Flow | Browser checks | Test files |
+|---|---|---|
+| Sign-in | Required email/password, malformed email, trimming versus significant password whitespace, length boundaries, click and Enter submission | `frontend-input-validation.spec.ts` |
+| Add/Edit Employee | Every required field and reference selection, whitespace, ID/email/date/decimal formats, text limits, immutable fields, optional end date, correction before save | `frontend-employee-validation.spec.ts`, `frontend.spec.ts` |
+| Salary update | Positive amount and precision/range, real calendar dates and employment bounds, reason requirements/length, correction and retry behavior | `frontend-salary-date.spec.ts`, `frontend-salary-text.spec.ts`, `frontend-input-validation.spec.ts`, `frontend-salary-recovery.spec.ts` |
+| Monthly estimate | Required `YYYY-MM`, month range, invalid year zero, correction via Enter | `frontend-input-validation.spec.ts`, `frontend.spec.ts` |
+| Directory | Search limits/clearing, required whole-number page range, invalid page recovery, filter values, suggestions and state restoration | `frontend-input-validation.spec.ts`, `frontend-directory*.spec.ts` |
+| Reports | All four filter categories, multiple selections, reference codes, optional/multiple grouping and Clear | `frontend-input-validation.spec.ts`, `frontend-filter-hover.spec.ts`, `frontend.spec.ts` |
+| Backend validation through the UI | Calendar validity/order, future joining dates, salary limits/precision, duplicate ID/email, rejected-write preservation, successful corrections and exact persisted values | `frontend-validation-live.spec.ts` |
+
+History is read-only; existing workflow tests cover its pagination and displayed values. The live validation cases are regression coverage for existing backend rules. New bug fixes record their observed failures and passing checks in the engineering notes.
+
+## Coverage-gap verification — 26 October 2026
+
+| Requirement | Added evidence |
+|---|---|
+| SAL-03 / RET-01 | `SalaryRollbackTests`: actual constraint failures, post-rollback reads and safe retry/replay |
+| REP-04 / PAY-05 | `SnapshotConsistencyTests`: controlled committed writes between real query and reader continuation |
+| PAY-02 | Five calendar-boundary API cases covering leap February, non-leap February, 30/31-day months and single-day employment |
+| PAY-03 | A backdated October save recalculates October while preserving September's estimate |
+| UI-03 | Unit validation boundaries and all-engine browser regressions; committed Chromium desktop/mobile image comparisons |
+
+Observed local results: 227 backend cases, 32 frontend unit cases, 504 fixture browser checks and 26 live-backend Chromium checks passed. Backend coverage is 90.58% lines / 81.19% branches; frontend API/formatting/validation unit coverage is 96.91% lines / 88.67% branches / 90% functions. Both production builds pass. GitHub-hosted workflow execution and platform-specific image stability still require the first pushed run; passing local commands does not establish a successful Actions run. Performance/load evidence and actual timed session expiry remain outside these verified results.

@@ -14,6 +14,7 @@ import { createApiClient } from './services/api.mjs';
 import { formatMoney, formatDate, formatDateTime } from './util/format.mjs';
 import { registerCorePages } from './components/core-pages.mjs';
 import { registerEmployeePages } from './components/employee-pages.mjs';
+import { registerCodepointMaxlength } from './validator/text-length.mjs';
 
 const app = window.angular.module('acme', ['ngRoute', 'ngMaterial', 'ngMessages']);
 app.config(['$sceDelegateProvider', function ($sceDelegateProvider) {
@@ -53,6 +54,7 @@ app.config(['$routeProvider', '$locationProvider', '$mdThemingProvider', functio
 app.filter('formatMoney', () => formatMoney);
 app.filter('formatDate', () => formatDate);
 app.filter('formatDateTime', () => formatDateTime);
+registerCodepointMaxlength(app);
 registerCorePages(app);
 registerEmployeePages(app);
 window.angular.bootstrap(document, ['acme'], { strictDi: true });

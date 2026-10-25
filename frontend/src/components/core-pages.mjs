@@ -63,8 +63,10 @@ const shellTemplate = `
 <div ng-class="{'workspace': $ctrl.api.user}">
   <div class="sidebar-scrim" ng-if="$ctrl.api.user && $ctrl.menuOpen" ng-click="$ctrl.closeMenu()" aria-hidden="true"></div>
   <aside class="sidebar" ng-if="$ctrl.api.user" ng-class="{'open': $ctrl.menuOpen}" aria-label="Workspace navigation">
-    <a class="brand" href="#!/employees"><span class="brand-mark" aria-hidden="true">A</span><span>ACME</span></a><div class="eyebrow">People operations</div><div class="organization">ACME Organization<small>Salary management</small></div>
-    <nav class="nav-links"><a class="nav-link" href="#!/employees" ng-class="{'active': !$ctrl.isReports()}" ng-attr-aria-current="{{!$ctrl.isReports() ? 'page' : undefined}}">${people}Employees</a><a class="nav-link" href="#!/reports" ng-class="{'active': $ctrl.isReports()}" ng-attr-aria-current="{{$ctrl.isReports() ? 'page' : undefined}}">${chart}Reports</a></nav>
+    <div class="sidebar-navigation">
+      <a class="brand" href="#!/employees"><span class="brand-mark" aria-hidden="true">A</span><span>ACME</span></a><div class="eyebrow">People operations</div><div class="organization">ACME Organization<small>Salary management</small></div>
+      <nav class="nav-links"><a class="nav-link" href="#!/employees" ng-class="{'active': !$ctrl.isReports()}" ng-attr-aria-current="{{!$ctrl.isReports() ? 'page' : undefined}}">${people}Employees</a><a class="nav-link" href="#!/reports" ng-class="{'active': $ctrl.isReports()}" ng-attr-aria-current="{{$ctrl.isReports() ? 'page' : undefined}}">${chart}Reports</a></nav>
+    </div>
     <div class="sidebar-user"><strong>{{$ctrl.api.user.displayName}}</strong><small>HR Manager</small><button class="signout" ng-click="$ctrl.logout()" ng-disabled="$ctrl.signingOut">{{$ctrl.signingOut ? 'Signing out…' : 'Sign out'}}</button></div>
   </aside>
   <main id="main-content" ng-class="{'workspace-main': $ctrl.api.user}" tabindex="-1">
@@ -83,7 +85,8 @@ function SignInController(api, $scope, $rootScope, $location, $interval) {
   vm.$onDestroy = () => { vm.password = ''; $interval.cancel(ticker); };
   vm.submit = async form => {
     vm.submitted = true;
-    if (vm.busy || vm.remaining || form.$invalid) return;
+    if (vm.busy || vm.remaining) return;
+    if (form.$invalid) { vm.error = null; return; }
     vm.busy = true; vm.error = null;
     try { await api.login(vm.email, vm.password); $scope.$evalAsync(() => { $rootScope.accessMessage = null; $location.path('/employees'); }); }
     catch (error) { vm.error = error; if (error.retryAfter) { vm.remaining = error.retryAfter; vm.retryAt = Date.now() + error.retryAfter * 1000; } }
@@ -99,7 +102,7 @@ const signinTemplate = `
     <div ng-if="$ctrl.accessMessage" class="alert alert-warning" role="status">{{$ctrl.accessMessage}}</div>
     <div ng-if="$ctrl.error" class="alert alert-error" role="alert"><span>{{$ctrl.error.message}}</span><span ng-if="$ctrl.remaining"> Try again in {{$ctrl.remaining}} seconds.</span><span class="request-id" ng-if="$ctrl.error.requestId">Reference: {{$ctrl.error.requestId}}</span></div>
     <div class="field"><label for="signin-email">Work email</label><input id="signin-email" name="email" type="email" ng-model="$ctrl.email" ng-model-options="{allowInvalid: true}" autocomplete="username" placeholder="you@acme.example" maxlength="254" required aria-describedby="email-error"><span id="email-error" class="field-error" ng-if="$ctrl.submitted && signInForm.email.$invalid">Enter a valid work email.</span></div>
-    <div class="field"><label for="signin-password">Password</label><input id="signin-password" name="password" type="password" ng-model="$ctrl.password" ng-trim="false" autocomplete="current-password" maxlength="128" required aria-describedby="password-error"><span id="password-error" class="field-error" ng-if="$ctrl.submitted && ! $ctrl.error && signInForm.password.$invalid">Password is required.</span></div>
+    <div class="field"><label for="signin-password">Password</label><input id="signin-password" name="password" type="password" ng-model="$ctrl.password" ng-model-options="{ allowInvalid: true }" ng-trim="false" autocomplete="current-password" codepoint-maxlength="128" required aria-describedby="password-error"><span id="password-error" class="field-error" ng-if="$ctrl.submitted && ! $ctrl.error && signInForm.password.$invalid">{{signInForm.password.$error.codepointMaxlength ? 'Use no more than 128 characters.' : 'Password is required.'}}</span></div>
     <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.busy || $ctrl.remaining">{{$ctrl.busy ? 'Signing in…' : 'Sign in'}}</button><div class="signin-restriction">${shield}Authorized HR users only</div>
   </form><p class="signin-footer">Salary management · ACME Organization</p></div></div>
 </section>`;
@@ -151,9 +154,13 @@ function DirectoryController(api, $scope, $timeout, $location, directoryState) {
     ++suggestionSequence; $timeout.cancel(suggestionTimer);
     vm.suggestions = []; vm.activeSuggestion = -1;
   };
+  const normalizeSearch = () => {
+    vm.q = Array.from(vm.q || '').slice(0, 100).join('');
+    return vm.q.trim();
+  };
   vm.searchChanged = () => {
     vm.closeSuggestions();
-    const prefix = vm.q.trim();
+    const prefix = normalizeSearch();
     if (!prefix) return;
     const current = suggestionSequence;
     suggestionTimer = $timeout(async () => {
@@ -168,8 +175,9 @@ function DirectoryController(api, $scope, $timeout, $location, directoryState) {
   };
   vm.applySearch = () => {
     vm.closeSuggestions();
-    if (vm.q.trim() === vm.appliedQ) return;
-    vm.appliedQ = vm.q.trim(); vm.apply();
+    const query = normalizeSearch();
+    if (query === vm.appliedQ) return;
+    vm.appliedQ = query; vm.apply();
   };
   vm.searchBlur = event => {
     if (event.relatedTarget?.closest('#employee-suggestions')) return;
@@ -237,7 +245,7 @@ DirectoryController.$inject = ['api', '$scope', '$timeout', '$location', 'direct
 const directoryTemplate = `
 <section><div class="page-header"><div><h1>Employee directory</h1><p>Find people, maintain salary records, and keep your organization up to date.</p></div><a class="btn btn-primary" href="#!/employees/new"><span aria-hidden="true">+</span> Add employee</a></div>
   ${referenceError}
-  <div class="card filter-card"><div class="search-row"><div class="search-box"><label class="sr-only" for="employee-search">Search by name or employee ID</label><input id="employee-search" class="search-input" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-controls="employee-suggestions" ng-attr-aria-expanded="{{$ctrl.suggestions.length > 0}}" ng-attr-aria-activedescendant="{{$ctrl.activeSuggestion >= 0 ? 'employee-suggestion-' + $ctrl.activeSuggestion : undefined}}" ng-model="$ctrl.q" ng-change="$ctrl.searchChanged()" ng-blur="$ctrl.searchBlur($event)" ng-keydown="$ctrl.searchKey($event)" placeholder="Search by name or employee ID" maxlength="100"><div id="employee-suggestions" class="employee-suggestions" role="listbox" aria-label="Employee suggestions" ng-if="$ctrl.suggestions.length"><button type="button" role="option" tabindex="-1" ng-repeat="employee in $ctrl.suggestions track by employee.employeeId" id="employee-suggestion-{{$index}}" ng-attr-aria-selected="{{$index === $ctrl.activeSuggestion}}" ng-mousedown="$event.preventDefault()" ng-click="$ctrl.chooseSuggestion(employee)">{{employee.fullName}}</button></div></div><small ng-if="$ctrl.result">{{$ctrl.result.totalElements | number}} employees · All statuses</small></div><div class="filter-grid">${filterControls(true)}<button class="btn btn-secondary" type="button" data-clear-filters ng-click="$ctrl.clear()">Clear filters</button></div></div>
+  <div class="card filter-card"><div class="search-row"><div class="search-box"><label class="sr-only" for="employee-search">Search by name or employee ID</label><input id="employee-search" class="search-input" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-controls="employee-suggestions" ng-attr-aria-expanded="{{$ctrl.suggestions.length > 0}}" ng-attr-aria-activedescendant="{{$ctrl.activeSuggestion >= 0 ? 'employee-suggestion-' + $ctrl.activeSuggestion : undefined}}" ng-model="$ctrl.q" ng-change="$ctrl.searchChanged()" ng-blur="$ctrl.searchBlur($event)" ng-keydown="$ctrl.searchKey($event)" placeholder="Search by name or employee ID"><div id="employee-suggestions" class="employee-suggestions" role="listbox" aria-label="Employee suggestions" ng-if="$ctrl.suggestions.length"><button type="button" role="option" tabindex="-1" ng-repeat="employee in $ctrl.suggestions track by employee.employeeId" id="employee-suggestion-{{$index}}" ng-attr-aria-selected="{{$index === $ctrl.activeSuggestion}}" ng-mousedown="$event.preventDefault()" ng-click="$ctrl.chooseSuggestion(employee)">{{employee.fullName}}</button></div></div><small ng-if="$ctrl.result">{{$ctrl.result.totalElements | number}} employees · All statuses</small></div><div class="filter-grid">${filterControls(true)}<button class="btn btn-secondary" type="button" data-clear-filters ng-mousedown="$event.preventDefault()" ng-click="$ctrl.clear()">Clear filters</button></div></div>
   ${loading}${requestError}
   <div ng-if="$ctrl.result && !$ctrl.loading">
     <div class="card empty-state" ng-if="!$ctrl.result.items.length"><h2>No matching employees</h2><p>Try a different search or clear your filters.</p><button class="btn btn-secondary" ng-click="$ctrl.clear()">Clear filters</button></div>

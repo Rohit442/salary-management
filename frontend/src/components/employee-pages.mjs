@@ -31,6 +31,13 @@ function setup(vm, $scope) {
   $scope.$on('$destroy', () => { destroyed = true; });
   vm.paint = () => { if (!destroyed) $scope.$applyAsync(); };
   vm.fieldError = field => (vm.error?.fieldErrors || []).filter(item => item.field === field).map(item => item.message).join(' ');
+  vm.lengthError = (form, field, maximum) => {
+    const control = form?.[field];
+    if (control?.$error.codepointMaxlength && (control.$touched || form.$submitted)) {
+      return `Use no more than ${maximum} characters.`;
+    }
+    return vm.fieldError(field);
+  };
   vm.initials = name => (name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('');
   vm.label = (items, code) => (items || []).find(item => (item.code || item.value) === code)?.label || code;
   vm.dateTime = formatDateTime;
@@ -80,7 +87,7 @@ const detailTemplate = `
     <div class="alert alert-info" ng-if="$ctrl.statusNeedsReview"><p>Review the current employee record before another status change.</p><button class="btn btn-secondary" ng-click="$ctrl.load()">Reload employee</button></div>
     <section class="card estimate-card"><div class="estimate-heading"><div><h2 class="section-title">Monthly base-pay estimate</h2><p class="muted">Mid-month salary changes apply to the whole month. Joining and leaving dates determine eligible days.</p></div><span class="badge" ng-if="$ctrl.estimate">Estimate</span></div>
       <form class="estimate-controls" name="estimateForm" ng-submit="$ctrl.calculate(estimateForm)" novalidate>
-        <div class="field"><label for="estimate-month">Selected month</label><input id="estimate-month" name="month" type="text" inputmode="numeric" placeholder="YYYY-MM" ng-model="$ctrl.month" ng-change="$ctrl.clearEstimate()" pattern="[0-9]{4}-(0[1-9]|1[0-2])" required aria-describedby="month-hint"><span id="month-hint" class="field-hint">Year and month, for example 2026-11</span></div>
+        <div class="field"><label for="estimate-month">Selected month</label><input id="estimate-month" name="month" type="text" inputmode="numeric" placeholder="YYYY-MM" ng-model="$ctrl.month" ng-change="$ctrl.clearEstimate()" pattern="(?!0000)[0-9]{4}-(0[1-9]|1[0-2])" required aria-describedby="month-hint"><span id="month-hint" class="field-hint">Year and month, for example 2026-11</span></div>
         <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.estimateLoading">{{$ctrl.estimateLoading ? 'Calculating…' : 'Calculate estimate'}}</button>
       </form>
       <div ng-if="$ctrl.estimateError" class="alert alert-error" role="alert"><p>{{$ctrl.estimateError.message}}</p><button class="btn btn-secondary" ng-click="$ctrl.calculate(estimateForm)" ng-disabled="$ctrl.estimateLoading">Try again</button></div>
@@ -118,7 +125,7 @@ function DetailController(api, $routeParams, $location, $scope, $mdDialog) {
   };
   vm.clearEstimate = () => { estimateRequest++; vm.estimate = null; vm.estimateError = null; vm.estimateLoading = false; };
   vm.calculate = async form => {
-    if (form?.$invalid || !/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(vm.month || '')) { vm.estimateError = { message: 'Choose a valid month in YYYY-MM format.' }; return; }
+    if (form?.$invalid || !/^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])$/.test(vm.month || '')) { vm.estimateError = { message: 'Choose a valid month in YYYY-MM format.' }; return; }
     const serial = ++estimateRequest; const month = vm.month;
     vm.estimateLoading = true; vm.estimate = null; vm.estimateError = null;
     try { const result = await api.get(`${employeePath(vm.id)}/base-pay-estimate`, { month }); if (serial === estimateRequest && alive()) vm.estimate = result; }
@@ -198,7 +205,7 @@ const salaryTemplate = `
       <fieldset ng-disabled="$ctrl.saving || $ctrl.uncertain || $ctrl.employee.employmentStatus === 'INACTIVE'">
         <div class="salary-amount-row"><div class="field"><label for="annualBaseSalary">Annual base salary <span aria-hidden="true">*</span></label><input id="annualBaseSalary" name="annualBaseSalary" type="text" inputmode="decimal" ng-model="$ctrl.draft.annualBaseSalary" ng-model-options="{ allowInvalid: true }" ng-blur="$ctrl.validateField('annualBaseSalary', salaryForm.annualBaseSalary)" ng-change="$ctrl.clearValidation('annualBaseSalary', salaryForm.annualBaseSalary)" pattern="[0-9]+(\\.[0-9]+)?" required aria-describedby="salary-hint salary-amount-error" aria-invalid="{{$ctrl.fieldError('annualBaseSalary') ? 'true' : 'false'}}"><span id="salary-amount-error" class="field-error" aria-live="polite">{{$ctrl.fieldError('annualBaseSalary')}}</span></div><div class="field"><label for="salary-currency">Currency</label><input id="salary-currency" ng-value="$ctrl.employee.currency" readonly></div></div>
         <p class="field-hint" id="salary-hint">Currency is fixed. Use a positive amount without commas, with up to {{$ctrl.precision}} decimal places.</p>
-        <div class="field"><label for="reason">Reason for change <span aria-hidden="true">*</span></label><textarea id="reason" name="reason" rows="4" maxlength="1000" ng-model="$ctrl.draft.reason" required aria-describedby="reason-hint"></textarea><span id="reason-hint" class="field-hint">This reason will be saved in the employee’s salary history.</span><span class="field-error">{{$ctrl.fieldError('reason')}}</span></div>
+        <div class="field"><label for="reason">Reason for change <span aria-hidden="true">*</span></label><textarea id="reason" name="reason" rows="4" codepoint-maxlength="1000" ng-model="$ctrl.draft.reason" ng-model-options="{ allowInvalid: true }" required aria-describedby="reason-hint reason-error" aria-invalid="{{$ctrl.lengthError(salaryForm, 'reason', 1000) ? 'true' : 'false'}}"></textarea><span id="reason-hint" class="field-hint">This reason will be saved in the employee’s salary history.</span><span id="reason-error" class="field-error" aria-live="polite">{{$ctrl.lengthError(salaryForm, 'reason', 1000)}}</span></div>
         <div class="field effective-date-field"><label for="effectiveDate">Effective from <span aria-hidden="true">*</span></label><input id="effectiveDate" name="effectiveDate" type="text" placeholder="YYYY-MM-DD" ng-model="$ctrl.draft.effectiveDate" ng-model-options="{ allowInvalid: true }" ng-blur="$ctrl.validateField('effectiveDate', salaryForm.effectiveDate)" ng-change="$ctrl.clearValidation('effectiveDate', salaryForm.effectiveDate)" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" required aria-describedby="effective-date-hint effective-date-error" aria-invalid="{{$ctrl.fieldError('effectiveDate') ? 'true' : 'false'}}"><span id="effective-date-error" class="field-error" aria-live="polite">{{$ctrl.fieldError('effectiveDate')}}</span></div>
         <p id="effective-date-hint" class="field-hint">Must be after {{$ctrl.employee.salaryEffectiveFrom | formatDate}}, on or before today ({{$ctrl.today | formatDate}}), and within employment dates.</p>
       </fieldset>
@@ -293,7 +300,10 @@ function SalaryController(api, $routeParams, $location, $scope, $timeout) {
 }
 
 const fieldError = name => `<span class="field-error">{{$ctrl.fieldError('${name}')}}</span>`;
-const textField = (name, label, options = '') => `<div class="field"><label for="${name}">${label} <span aria-hidden="true">*</span></label><input id="${name}" name="${name}" type="text" ng-model="$ctrl.draft.${name}" required ${options}>${fieldError(name)}</div>`;
+const textField = (name, label, options = '', error = fieldError(name)) => `<div class="field"><label for="${name}">${label} <span aria-hidden="true">*</span></label><input id="${name}" name="${name}" type="text" ng-model="$ctrl.draft.${name}" required ${options}>${error}</div>`;
+const limitedTextField = (name, label, options = '') => textField(name, label,
+  `codepoint-maxlength="200" ng-model-options="{ allowInvalid: true }" aria-describedby="${name}-error" aria-invalid="{{$ctrl.lengthError(employeeForm, '${name}', 200) ? 'true' : 'false'}}" ${options}`,
+  `<span id="${name}-error" class="field-error" aria-live="polite">{{$ctrl.lengthError(employeeForm, '${name}', 200)}}</span>`);
 const selectField = (name, label, source, key) => `<div class="field"><label for="${name}">${label} <span aria-hidden="true">*</span></label><select id="${name}" name="${name}" ng-model="$ctrl.draft.${name}" ng-options="item.${key} as item.label for item in $ctrl.refs.${source}" required><option value="">Choose ${label.toLowerCase()}</option></select>${fieldError(name)}</div>`;
 
 const formTemplate = `
@@ -308,12 +318,12 @@ const formTemplate = `
     <div ng-if="$ctrl.notice" class="alert alert-info" role="status">{{$ctrl.notice}}</div>
     <fieldset ng-disabled="$ctrl.saving || $ctrl.uncertain">
       <div class="form-grid employee-fields">
-        ${textField('employeeId', 'Employee ID', 'ng-readonly="$ctrl.editing" placeholder="EMP-000001" pattern="EMP-[0-9]{6}"')}
-        ${textField('fullName', 'Full name', 'maxlength="200" autocomplete="name"')}
+        <div class="field"><label for="employeeId">Employee ID <span aria-hidden="true">*</span></label><input id="employeeId" name="employeeId" type="text" ng-model="$ctrl.draft.employeeId" ng-readonly="$ctrl.editing" placeholder="EMP-000001" pattern="EMP-[0-9]{6}" required aria-describedby="employee-id-hint employee-id-error" aria-invalid="{{$ctrl.employeeIdError(employeeForm) ? 'true' : 'false'}}"><span id="employee-id-hint" class="field-hint">Format: EMP-010001 (EMP- and six digits).</span><span id="employee-id-error" class="field-error" aria-live="polite">{{$ctrl.employeeIdError(employeeForm)}}</span></div>
+        ${limitedTextField('fullName', 'Full name', 'autocomplete="name"')}
         <div class="field"><label for="workEmail">Work email <span aria-hidden="true">*</span></label><input id="workEmail" name="workEmail" type="email" ng-model="$ctrl.draft.workEmail" maxlength="254" autocomplete="email" required>${fieldError('workEmail')}</div>
         ${selectField('countryCode', 'Country', 'countries', 'code')}
         ${selectField('department', 'Department', 'departments', 'value')}
-        ${textField('jobTitle', 'Job title', 'maxlength="200"')}
+        ${limitedTextField('jobTitle', 'Job title')}
         ${selectField('jobLevel', 'Job level', 'jobLevels', 'value')}
         <div class="field"><label for="employmentStatus">Employment status</label><input id="employmentStatus" ng-value="$ctrl.employee.employmentStatus === 'INACTIVE' ? 'Inactive' : 'Active'" readonly></div>
         <div class="field" ng-if="!$ctrl.editing"><label for="annualBaseSalary">Annual base salary <span aria-hidden="true">*</span></label><input id="annualBaseSalary" name="annualBaseSalary" type="text" inputmode="decimal" ng-model="$ctrl.draft.annualBaseSalary" pattern="[0-9]+(\\.[0-9]+)?" required><span class="field-hint">Use a positive amount without commas.</span>${fieldError('annualBaseSalary')}</div>
@@ -344,10 +354,17 @@ function FormController(api, $routeParams, $location, $scope) {
     } catch (error) { vm.loadError = error; }
     finally { vm.loading = false; vm.paint(); }
   };
+  vm.employeeIdError = form => {
+    const control = form?.employeeId;
+    if (!control || (!control.$touched && !form.$submitted)) return '';
+    if (control.$error.required) return 'Enter an employee ID.';
+    if (control.$error.pattern) return 'Use EMP- followed by exactly six digits, for example EMP-010001.';
+    return vm.fieldError('employeeId');
+  };
   vm.joiningChanged = () => { if (!vm.editing && !vm.initialDateEdited) vm.draft.initialSalaryEffectiveFrom = vm.draft.joiningDate; };
   vm.save = async form => {
     if (vm.saving || vm.uncertain || vm.needsReview) return;
-    if (form.$invalid) { form.$setSubmitted(); vm.fail({ message: 'Complete the required fields and use dates in YYYY-MM-DD format.', fieldErrors: [] }); return; }
+    if (form.$invalid) { form.$setSubmitted(); vm.fail({ message: 'Complete the required fields and correct any invalid values.', fieldErrors: [] }); return; }
     vm.saving = true; vm.error = null; vm.latest = null; vm.notice = null;
     const id = vm.editing ? vm.id : vm.draft.employeeId;
     try {

@@ -57,3 +57,5 @@ databaseChangeLog:
       file: db/changelog/011-auth-account-identity.yaml
   - include:
       file: db/changelog/012-salary-public-identity.yaml
+  - include:
+      file: db/changelog/013-unicode-text-capacity.yaml

@@ -23,7 +23,7 @@ Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yam
 
 Migrations `005`–`009` add reference tables/data, complete the existing employee table, create salary history, and remove `SAMPLE_MESSAGE`. Applied migrations `001`–`004` are unchanged for compatibility. The original employee seed remains a recorded, one-time Liquibase change; the later schema migration attaches its rows to the currency and provenance records. No employees are copied into another table or regenerated during upgrade.
 
-The employee table enforces unique normalized email/employee IDs, positive amounts, valid date ordering, and creator/currency foreign keys. Field sizes match the employee contract, including 200-character names and job titles. Salary history enforces actor and employee/currency relationships, positive changed amounts, unique actor/retry keys, and unique employee effective dates/resulting versions. Its history index supports employee/time/ID ordering. Foreign keys preserve referenced records rather than cascading deletion.
+The employee table enforces unique normalized email/employee IDs, positive amounts, valid date ordering, and creator/currency foreign keys. The API permits 200 Unicode code points for names/job titles and 1,000 for salary reasons. Migration `013` provides `VARCHAR(400)` storage for names/job titles and `VARCHAR(2000)` for reasons because H2 counts UTF-16 units; application validation retains the original code-point limits. Salary history enforces actor and employee/currency relationships, positive changed amounts, unique actor/retry keys, and unique employee effective dates/resulting versions. Its history index supports employee/time/ID ordering. Foreign keys preserve referenced records rather than cascading deletion.
 
 HR-user and currency seed records are native YAML `insert` changes; their Java custom seeder has been removed. Datafaker employee generation remains in a Liquibase-managed custom change that returns insert statements; Liquibase executes them and manages their transaction.
 
@@ -65,7 +65,7 @@ The first database migration automatically generates 10,000 employees across fiv
 
 `spring.liquibase.parameters.employeeCount` defaults to `10000`; the test profile uses `20`. Keep this changeset parameter unchanged for an existing database. The file-persistence test explicitly creates the old 10,000-employee database, edits a row, upgrades to the ER schema, and restarts again. It verifies that the edit and row count survive with valid creator/currency links and no repeated seed execution.
 
-Existing databases receive the new ER migrations on their next backend startup. Employee API implementation status is tracked in the README.
+Existing databases receive new migrations on their next backend startup, including the data-preserving Unicode capacity change `013`. Employee API implementation status is tracked in the README.
 
 The employee schema uses `DECIMAL(19,4)`; generated salary amounts use `BigDecimal`. Validate constraints, reports, transactions, and retry behavior against H2 using the same Liquibase migrations.
 

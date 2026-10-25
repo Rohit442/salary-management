@@ -6,4 +6,35 @@
 
 /* Keep multi-select pointer hover separate from persistent option focus. */
 md-select-menu[multiple] md-content[role="listbox"] md-option:not([disabled]):not(:hover) { background-color: var(--surface); }
-md-select-menu[multiple] md-content[role="listbox"]:focus-visible md-option.md-focused { outline: 2px solid var(--blue); outline-offset: -3px; }
+md-select-menu[multiple] md-content[role="listbox"]:focus md-option.md-focused { outline: 2px solid var(--blue); outline-offset: -3px; }
+
+/* Keep the account actions visible while short mobile menus scroll independently. */
+.sidebar-navigation { display: contents; }
+@media (max-width: 760px) {
+  .sidebar {
+    min-height: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding-top: calc(22px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+  .sidebar-navigation {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding: 6px;
+    margin: -6px -6px 0;
+  }
+  .sidebar-navigation > * { flex-shrink: 0; }
+  .sidebar-user { flex-shrink: 0; margin-top: 16px; }
+  .sidebar-user strong { overflow-wrap: anywhere; }
+  .signout { min-height: 44px; }
+}
+@media (max-width: 760px) and (max-height: 400px) {
+  .sidebar .brand { margin-bottom: 12px; }
+  .sidebar .organization { margin-top: 8px; margin-bottom: 12px; }
+}

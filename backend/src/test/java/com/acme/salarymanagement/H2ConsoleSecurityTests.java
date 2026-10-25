@@ -1,6 +1,8 @@
 package com.acme.salarymanagement;
 
 import java.net.URI;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
 import java.net.URLEncoder;
 import java.util.regex.Pattern;
 import java.net.http.HttpClient;
@@ -17,7 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"spring.h2.console.enabled=true", "spring.security.user.password=console-test-password"})
+        properties = "spring.h2.console.enabled=true")
 @ActiveProfiles("test")
 class H2ConsoleSecurityTests {
     @LocalServerPort private int port;
@@ -48,6 +50,31 @@ class H2ConsoleSecurityTests {
     }
 
     @Test
+    void databaseSignInCreatesAnAuthenticatedSessionAndRotatesItsId() throws Exception {
+        var cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+        var sessionClient = HttpClient.newBuilder().cookieHandler(cookies).build();
+        sessionClient.send(request("/h2-console/", false).header("Accept", "text/html").GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        var login = sessionClient.send(request("/login", false).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(login.statusCode()).isEqualTo(200);
+        var csrf = Pattern.compile("name=\"_csrf\"[^>]*value=\"([^\"]+)\"").matcher(login.body());
+        assertThat(csrf.find()).isTrue();
+        String anonymousSession = cookies.getCookieStore().getCookies().stream()
+                .filter(cookie -> cookie.getName().equals("JSESSIONID")).findFirst().orElseThrow().getValue();
+        var result = sessionClient.send(request("/login", false)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("email=maya.rao%40acme.example&password=AcmeDev%212026&_csrf="
+                        + URLEncoder.encode(csrf.group(1), StandardCharsets.UTF_8))).build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(result.statusCode()).isEqualTo(302);
+        assertThat(result.headers().firstValue("Location").orElseThrow()).doesNotContain("error");
+        String authenticatedSession = cookies.getCookieStore().getCookies().stream()
+                .filter(cookie -> cookie.getName().equals("JSESSIONID")).findFirst().orElseThrow().getValue();
+        assertThat(authenticatedSession).isNotEqualTo(anonymousSession);
+        var console = sessionClient.send(request("/h2-console/", false).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(console.statusCode()).isEqualTo(200);
+    }
+
+    @Test
     void consoleRequiresSignIn() throws Exception {
         var response = client.send(request("/h2-console/", false).header("Accept", "text/html")
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
@@ -73,7 +100,7 @@ class H2ConsoleSecurityTests {
         var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
         if (authenticated) {
             String credentials = Base64.getEncoder().encodeToString(
-                    "user:console-test-password".getBytes(StandardCharsets.UTF_8));
+                    "maya.rao@acme.example:AcmeDev!2026".getBytes(StandardCharsets.UTF_8));
             builder.header("Authorization", "Basic " + credentials);
         }
         return builder;

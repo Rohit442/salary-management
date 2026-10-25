@@ -91,3 +91,96 @@ AI may help propose edge cases, test scaffolding, or refactorings. Review assert
 - [DORA test automation](https://dora.dev/capabilities/test-automation/) and [continuous integration](https://dora.dev/capabilities/continuous-integration/)
 - [AWS safe retries and idempotency](https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/)
 - [Google SRE monitoring signals](https://sre.google/sre-book/monitoring-distributed-systems/)
+
+## Authentication API initial red-phase coverage — 25 October 2026
+
+The current test-first suite is `backend/src/test/java/com/acme/salarymanagement/rest/AuthenticationApiContractTest.java`, derived from `api-auth.md`. It uses the real security chain and an isolated H2 fixture; HTTP/session assertions are integration tests, not database-free unit tests.
+
+| Endpoint | Core contract cases |
+|---|---|
+| `GET /api/auth/csrf` | Anonymous token/session issuance, token/header fields, login token rotation, shared response headers |
+| `POST /api/auth/login` | HR JSON response, email normalization, password whitespace significance, generic credential failures, required/duplicate/unknown fields, password length, JSON rejection, CSRF, attempt limits and success reset |
+| `GET /api/auth/me` | Current user response, anonymous rejection, fresh enabled-status check and revoked-session invalidation |
+| `POST /api/auth/logout` | Session invalidation, expired cookie, bodyless 204, anonymous logout, CSRF rejection without losing the current session, old-token rejection and refreshed-token success |
+| All four | Unsupported-method JSON errors and `Allow`; response/error helpers verify correlation IDs, no-store, no redirects, and exclusion of sensitive response fields |
+
+`HrUserDetailsServiceTest` and `LoginFailureHandlerTest` add 14 isolated regression cases for existing email normalization, result mapping, enabled flags, missing accounts, database-outage propagation and generic browser failure handling. They need no Spring context/database and do not represent retroactive TDD for the already implemented browser login.
+
+Observed `mvn test`: 59 cases, 30 passing, 29 expected contract failures, zero test errors or skips. The API routes remain unimplemented. Additional transport/container details such as raw malformed form parsing, session cookie attributes and timed expiry require focused tests as those behaviors are introduced; this core suite is not a claim that every contract branch is covered.
+
+## Authentication test results — 25 October 2026
+
+This is the baseline snapshot before the CSRF implementation. The later CSRF increment records the current result below.
+
+A test passes when all assertions for its behavior match the actual result and the test completes without failure/error. Assertions check observable results such as normalized email, enabled flags, generic failure messages, HTTP responses, or persisted rows. Passing a test for existing code does not establish that a new API is implemented.
+
+| Test group | Cases | Observed result | What it verifies |
+|---|---:|---|---|
+| `HrUserDetailsServiceTest` | 9 | Pass | Existing email normalization, stored-user mapping, disabled flags, missing accounts, database-outage propagation; SQL dependency/result rows are mocked |
+| `LoginFailureHandlerTest` | 5 | Pass | Existing browser sign-in failure redirect and generic failure message; uses mock servlet requests/responses |
+| Existing regression suites | 16 | Pass | Existing Spring browser login, H2 console/security, Liquibase schemas and constraints, seeding, upgrades, and persistence |
+| `AuthenticationApiContractTest` | 29 | Fail | New JSON auth APIs: `/api/auth/csrf`, `/api/auth/login`, `/api/auth/me`, `/api/auth/logout`; routes/required JSON behavior are absent |
+| **Total** | **59** | **30 pass, 29 fail** | **The full test run fails; zero new API cases pass** |
+
+The 14 isolated unit tests exercise existing Java components. They start neither Spring nor H2 and do not prove API routing, database queries, or complete authentication/session behavior. The 16 existing regression tests cover the implemented bootstrap/browser/database behavior. These 30 passes are independent of the missing JSON API implementation.
+
+### Commands actually executed
+
+The working directory was `/Users/rohit/Personal projects/salary-management/backend`. Execution used IntelliJ's bundled Maven and JDK 25, with the project's Java 21 compilation target. The command prefix was:
+
+```sh
+JAVA_HOME='/Applications/IntelliJ IDEA.app/Contents/jbr/Contents/Home' \
+  '/Applications/IntelliJ IDEA.app/Contents/plugins/maven-plugin/lib/maven3/bin/mvn'
+```
+
+That prefix was used for these Maven arguments:
+
+```text
+-B -Dtest=HrUserDetailsServiceTest,LoginFailureHandlerTest test
+-B -Dtest=AuthenticationApiContractTest test
+-B test
+```
+
+The first run passed all 14 unit cases. The second failed all 29 API contract cases. The final full run reported:
+
+```text
+Tests run: 59, Failures: 29, Errors: 0, Skipped: 0
+BUILD FAILURE
+```
+
+This records the TDD red stage, not completed API functionality. Implementation must make the contract cases pass while retaining the existing regression passes. Tests added to already implemented components are regression coverage rather than evidence that those components were developed test-first.
+
+## CSRF API first increment — 25 October 2026
+
+The approved first increment implements `GET /api/auth/csrf`, with a dedicated validator, service interface/implementation, typed responses, API-only security chain, header-only CSRF resolution, shared JSON errors, server request IDs and no-store headers. Spring owns session-backed token generation. Existing browser sign-in and H2 console security retain their separate chains.
+
+Observed red: the original anonymous-CSRF contract case returned 401 rather than 200. Eight new request/token cases also failed before implementation. The focused implementation run then passed those eight cases and the original case. A further saved-request/session regression check was added, producing nine passing `CsrfApiTests` cases.
+
+The CSRF suite verifies anonymous session/token association without authentication, session reuse, client request-ID replacement, query/body rejection, JSON negotiation, unsupported methods/Allow, CSRF rejection precedence, actual issued-token acceptance in a header, rejection of token form parameters, and absence of saved-request sessions for unauthenticated API requests. The shared JSON error writer formats failures from both the MVC and security-filter paths. The browser-session fixture now asserts successful authenticated HR identity, and the test profile explicitly selects demo seed data.
+
+Final `mvn -B test`: 68 cases, 43 passing, 25 failures, zero errors/skips. The full build remains failed. Breakdown:
+
+| Group | Passing | Failing |
+|---|---:|---:|
+| Existing regression cases | 30 | 0 |
+| `CsrfApiTests` | 9 | 0 |
+| `AuthenticationApiContractTest` | 4 | 25 |
+
+The four green auth contract cases are anonymous CSRF issuance, unsupported-method rejection for the CSRF path, anonymous `/me` rejection, and missing-CSRF rejection before login. The latter checks prove shared guards, not successful login/current-user/logout functionality. Those three implementations remain pending. Raw transport/cookie/expiry checks still require their planned embedded-server coverage; no end-to-end completion is claimed.
+
+Focused command arguments used with the recorded IntelliJ Maven/JDK prefix:
+
+```text
+-B -Dtest=AuthenticationApiContractTest#csrfIsPublicAndCreatesAnAnonymousSessionWithAnOpaqueToken test
+-B -Dtest=CsrfApiTests test
+-B -Dtest=CsrfApiTests,AuthenticationApiContractTest#csrfIsPublicAndCreatesAnAnonymousSessionWithAnOpaqueToken test
+-B test
+```
+
+## Remaining authentication APIs: green increment — 25 October 2026
+
+The current JSON auth implementation is complete for the four documented routes. Focused tests first reproduced missing login/current-user/logout behavior (401/404 instead of 200/204). New isolated tests reproduced unimplemented rolling-window behavior and BCrypt's inability to encode 128-character passwords before those implementations were added.
+
+The final local `mvn -B clean verify` used IntelliJ's bundled Maven/JDK, the Java 21 target, isolated H2 fixtures and random-port embedded HTTP servers. Result: **81 tests, zero failures/errors/skips; BUILD SUCCESS**, including all 29 original contract cases, nine CSRF checks, five password/limiter cases and eight additional real HTTP cases. The remaining cases are the existing regressions. The packaged application was produced; no commit was made.
+
+HTTP coverage verifies the complete CSRF/login/refresh/me/logout flow, real session-cookie creation/rotation/deletion, local HttpOnly/SameSite flags, rejection of stale cookies/tokens, validation before logout cleanup, raw malformed/duplicate fields, and declared/chunked body bounds. Limiter expiry/rounding/pair isolation uses an injected clock without sleeps. Actual timed servlet expiry and an HTTPS deployment were not exercised by this run; the configured timeout and production cookie setting remain explicit.

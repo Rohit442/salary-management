@@ -1,0 +1,336 @@
+{
+  "info": {
+    "_postman_id": "931fa049-26e6-4ec9-b86c-1e3fbeef4d8d",
+    "name": "ACME Salary Management — Authentication",
+    "schema": "https://schema.postman.com/json/collection/v2.1.0/collection.json",
+    "description": "Authentication APIs for the local Spring Boot backend. Start/restart the backend before running.\n\nImport this JSON file into Postman, then run all five requests in order. Five requests cover four unique APIs: CSRF is fetched again after login because the original token is invalidated.\n\n1. Get CSRF before login.\n2. Login using the documented local demo account.\n3. Refresh CSRF after login.\n4. Get current user.\n5. Logout.\n\nPostman's cookie jar must remain enabled. It automatically retains and replaces JSESSIONID; no Cookie header or manual session variable is needed. Scripts save the CSRF token, clear it after login/logout, and place it in the POST request header. Error responses stop the collection run; there are no automatic credential retries.\n\nCollection variables: baseUrl=http://localhost:8080, email=maya.rao@acme.example, password=AcmeDev!2026. These credentials are the documented local demo account. Change variables for another environment/account. For localhost, use Postman Desktop or its Desktop Agent.\n\nAfter logout or backend restart, begin again at request 1. To test manually, use the same order. Importing an updated collection starts with an empty CSRF variable; no live tokens or session IDs are embedded."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Backend origin, without a trailing slash."
+    },
+    {
+      "key": "email",
+      "value": "maya.rao@acme.example",
+      "type": "string",
+      "description": "Enabled local demo HR email."
+    },
+    {
+      "key": "password",
+      "value": "AcmeDev!2026",
+      "type": "string",
+      "description": "Documented local demo password."
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string",
+      "description": "Populated by the CSRF requests; do not enter a constant token."
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test(\"Response is not cached\", function () {",
+          "  pm.expect(pm.response.headers.get(\"Cache-Control\") || \"\").to.include(\"no-store\");",
+          "});",
+          "pm.test(\"Response has a server request UUID\", function () {",
+          "  pm.expect(pm.response.headers.get(\"X-Request-ID\") || \"\").to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+          "});",
+          "if (pm.response.code !== 204) {",
+          "  pm.test(\"Response is JSON\", function () {",
+          "    pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.include(\"application/json\");",
+          "  });",
+          "}",
+          "if (pm.response.code >= 400) {",
+          "  pm.collectionVariables.unset(\"csrfToken\");",
+          "  pm.execution.setNextRequest(null);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Get CSRF before login",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/csrf",
+        "description": "Creates an anonymous session. Saves its token for request 2."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"CSRF issuance returns 200\", function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset(\"csrfToken\");",
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.test(\"CSRF response contains the token and expected header\", function () {",
+              "    pm.expect(body.token).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.headerName).to.equal(\"X-CSRF-TOKEN\");",
+              "  });",
+              "  if (typeof body.token === \"string\" && body.token.length > 0 && body.headerName === \"X-CSRF-TOKEN\") {",
+              "    pm.collectionVariables.set(\"csrfToken\", body.token);",
+              "  } else {",
+              "    pm.execution.setNextRequest(null);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": [],
+      "protocolProfileBehavior": {
+        "disableCookies": false,
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "02 — Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/login",
+        "description": "Form-encoded HR credentials plus the initial token. Cookie jar receives the rotated session cookie. Run request 3 next.",
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "email",
+              "value": "{{email}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const token = pm.collectionVariables.get(\"csrfToken\");",
+              "if (!token) {",
+              "  pm.execution.setNextRequest(null);",
+              "  pm.execution.skipRequest();",
+              "  throw new Error(\"Run the appropriate Get CSRF request first. Keep Postman's cookie jar enabled.\");",
+              "}",
+              "pm.request.headers.upsert({ key: \"X-CSRF-TOKEN\", value: token });"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Authenticated user response returns 200\", function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.test(\"Response contains the HR identity and timeout\", function () {",
+              "    pm.expect(body.user.id).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.email).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.displayName).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.roles).to.include(\"HR\");",
+              "    pm.expect(body.idleTimeoutSeconds).to.be.a(\"number\").and.above(0);",
+              "    pm.expect(body.user).not.to.have.property(\"password\");",
+              "    pm.expect(body.user).not.to.have.property(\"passwordHash\");",
+              "    pm.expect(body).not.to.have.property(\"sessionId\");",
+              "  });",
+              "}",
+              "",
+              "// Successful authentication invalidates the pre-login token. Step 3 retrieves its replacement.",
+              "pm.collectionVariables.unset(\"csrfToken\");",
+              "pm.test(\"Login does not redirect\", function () {",
+              "  pm.expect(pm.response.headers.get(\"Location\")).to.not.be.ok;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "response": [],
+      "protocolProfileBehavior": {
+        "disableCookies": false,
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "03 — Refresh CSRF after login",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/csrf",
+        "description": "Gets the token belonging to the authenticated session. Required before logout or other writes."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"CSRF issuance returns 200\", function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset(\"csrfToken\");",
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.test(\"CSRF response contains the token and expected header\", function () {",
+              "    pm.expect(body.token).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.headerName).to.equal(\"X-CSRF-TOKEN\");",
+              "  });",
+              "  if (typeof body.token === \"string\" && body.token.length > 0 && body.headerName === \"X-CSRF-TOKEN\") {",
+              "    pm.collectionVariables.set(\"csrfToken\", body.token);",
+              "  } else {",
+              "    pm.execution.setNextRequest(null);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": [],
+      "protocolProfileBehavior": {
+        "disableCookies": false,
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "04 — Get current user",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/me",
+        "description": "Uses the authenticated session cookie automatically. A CSRF header is not needed for this GET."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Authenticated user response returns 200\", function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.test(\"Response contains the HR identity and timeout\", function () {",
+              "    pm.expect(body.user.id).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.email).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.displayName).to.be.a(\"string\").and.not.empty;",
+              "    pm.expect(body.user.roles).to.include(\"HR\");",
+              "    pm.expect(body.idleTimeoutSeconds).to.be.a(\"number\").and.above(0);",
+              "    pm.expect(body.user).not.to.have.property(\"password\");",
+              "    pm.expect(body.user).not.to.have.property(\"passwordHash\");",
+              "    pm.expect(body).not.to.have.property(\"sessionId\");",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": [],
+      "protocolProfileBehavior": {
+        "disableCookies": false,
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "05 — Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/logout",
+        "description": "Sends the refreshed token and current cookie. No request body. Expects 204 and clears the stored token."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const token = pm.collectionVariables.get(\"csrfToken\");",
+              "if (!token) {",
+              "  pm.execution.setNextRequest(null);",
+              "  pm.execution.skipRequest();",
+              "  throw new Error(\"Run the appropriate Get CSRF request first. Keep Postman's cookie jar enabled.\");",
+              "}",
+              "pm.request.headers.upsert({ key: \"X-CSRF-TOKEN\", value: token });"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Logout returns an empty 204 response\", function () {",
+              "  pm.response.to.have.status(204);",
+              "  pm.expect(pm.response.text()).to.equal(\"\");",
+              "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.not.be.ok;",
+              "});",
+              "if (pm.response.code === 204) {",
+              "  pm.collectionVariables.unset(\"csrfToken\");",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": [],
+      "protocolProfileBehavior": {
+        "disableCookies": false,
+        "followRedirects": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-auth-account-identity
+      author: salary-management
+      changes:
+        - addColumn:
+            tableName: hr_user
+            columns:
+              - column:
+                  name: public_id
+                  type: VARCHAR(36)
+                  defaultValueComputed: RANDOM_UUID()
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_hr_user_public_id
+        - modifyDataType:
+            tableName: hr_user
+            columnName: password_hash
+            newDataType: VARCHAR(255)

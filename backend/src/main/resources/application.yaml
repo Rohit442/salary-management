@@ -19,6 +19,26 @@ spring:
         jdbc:
           time_zone: UTC
   liquibase:
+    contexts: ${LIQUIBASE_CONTEXTS:demo}
     change-log: classpath:db/changelog/db.changelog-master.yaml
     parameters:
       employeeCount: 10000
+
+app:
+  auth:
+    idle-timeout-seconds: ${AUTH_IDLE_TIMEOUT_SECONDS:1800}
+    maximum-failures: ${AUTH_MAXIMUM_FAILURES:5}
+    attempt-window-seconds: ${AUTH_ATTEMPT_WINDOW_SECONDS:900}
+server:
+  servlet:
+    session:
+      timeout: ${app.auth.idle-timeout-seconds}s
+      cookie:
+        name: JSESSIONID
+        path: /
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+logging:
+  pattern:
+    level: "%5p [requestId=%X{requestId:-}]"

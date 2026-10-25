@@ -1,4 +1,4 @@
-package com.acme.salarymanagement.shared;
+package com.acme.salarymanagement.exception;
 
 public class UnimplementedMethodException extends UnsupportedOperationException {
     public UnimplementedMethodException(String operation) {

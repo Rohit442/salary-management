@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-seed-demo-hr-user
+      author: salary-management
+      contextFilter: "@demo"
+      changes:
+        - insert:
+            tableName: hr_user
+            columns:
+              - column:
+                  name: work_email
+                  value: maya.rao@acme.example
+              - column:
+                  name: password_hash
+                  value: "{bcrypt}$2a$10$S5Y0Oi4pquztLl/0ySMTX.G/r8h8wVSxiUwQrXF1WscBjBaetTmae"
+              - column:
+                  name: display_name
+                  value: Maya Rao
+              - column:
+                  name: role
+                  value: HR
+              - column:
+                  name: enabled
+                  valueBoolean: true

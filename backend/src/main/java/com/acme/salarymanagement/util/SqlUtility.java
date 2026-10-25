@@ -1,4 +1,4 @@
-package com.acme.salarymanagement.shared;
+package com.acme.salarymanagement.util;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

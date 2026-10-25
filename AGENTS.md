@@ -20,7 +20,7 @@ These instructions reflect the user's explicit request for precise communication
 
 - Keep schema changes and seed writes under Liquibase. Define static HR-user and currency seed records as native YAML changes, not Java seeders or startup hooks.
 
-- Organize by feature and separate controllers, request validation, service implementation, and data access. Keep call paths short; avoid pass-through layers and speculative abstractions.
+- Organize by responsibility using packages such as `rest`, `service`, `impl`, `bean`, `util`, `validator`, `filter`, `handler`, `exception`, and `config`. Keep controllers, validation, service implementation, and data access separate. Keep call paths short; avoid pass-through layers and speculative abstractions.
 - Keep request validations in dedicated Java validator files. Controller methods declare an error list, validate applicable headers/body/parameters inside a try block, call the service only when validation succeeds, and return the contract's status and body. Catch and translate exceptions appropriately; use shared exception handling to format error responses.
 - Use SLF4J. Log an exception once at its handling boundary with a request ID and appropriate severity; exclude credentials, session tokens, salary payloads, and change reasons.
 - Declare service operations in feature interfaces. Default implementations throw a custom `UnimplementedMethodException`; service implementation classes provide the actual behavior. Implement all exposed routes before describing them as functional.

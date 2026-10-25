@@ -1,4 +1,4 @@
-package com.acme.salarymanagement;
+package com.acme.salarymanagement.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -20,7 +20,7 @@ public class LocalSecurityConfiguration {
     SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .securityMatcher(PathRequest.toH2Console())
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("HR"))
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .formLogin(Customizer.withDefaults())
@@ -28,13 +28,4 @@ public class LocalSecurityConfiguration {
                 .build();
     }
 
-    @Bean
-    @Order(2)
-    SecurityFilterChain applicationSecurityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults())
-                .httpBasic(Customizer.withDefaults())
-                .build();
-    }
 }

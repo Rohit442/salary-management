@@ -88,7 +88,7 @@ Authentication/CSRF filters can reject a request before field validation. A miss
 
 ## 3. Shared curl setup
 
-The following commands target the future local server. They require curl and Python 3, and must not be run until the backend and a provisioned demo HR account exist. Example identities are fictional; no working password is supplied.
+The following commands target the local backend and require curl and Python 3. Start the backend first. The README supplies the development demo credentials; use the appropriate provisioned account for other environments.
 
 ```sh
 BASE_URL='http://localhost:8080'

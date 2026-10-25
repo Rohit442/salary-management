@@ -47,17 +47,22 @@ AngularJS is the assignment-driven frontend choice and must not be silently repl
 
 ## 2. Application structure
 
-Organize the backend by feature, with controller, service, DTO, and persistence responsibilities inside each feature:
+Organize the backend into the requested responsibility packages. Keep feature names in class names where needed:
 
 ```text
 backend/
   src/main/java/.../salarymanagement/
-    security/       HR identity, authentication, authorization
-    employee/       Directory, profiles, creation, detail edits, inactive status
-    salary/         Salary updates and read-only change history
-    reporting/      Filtered aggregates and grouping
-    reference/      Supported currencies, countries, departments, job levels
-    common/         Error responses and shared infrastructure
+    rest/           REST controllers
+    service/        Service interfaces and user-details service
+    impl/           Service implementations
+    bean/           Request/response records and DTOs
+    validator/      Request validation
+    util/           SQL and response utilities
+    filter/         Request filters
+    handler/        Security and exception handlers
+    exception/      Application exceptions
+    config/         Spring Security configuration
+    seed/           Liquibase Datafaker generation
   src/main/resources/db/changelog/
 frontend/
   src/              AngularJS routes, components, API services and styles
@@ -85,6 +90,7 @@ erDiagram
 
     HR_USER {
         number id PK
+        varchar public_id UK
         varchar work_email UK
         varchar password_hash
         varchar display_name

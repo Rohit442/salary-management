@@ -4,5 +4,6 @@ spring:
     username: sa
     password: ""
   liquibase:
+    contexts: demo
     parameters:
       employeeCount: 20

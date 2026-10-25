@@ -100,3 +100,42 @@ Add observed implementation results and significant decision changes to this log
 - Move all six static reference seed rows (one disabled HR provenance identity and five currencies) into native YAML `insert` changes in `006-seed-er-reference-data.yaml`; delete `ReferenceDataSeedChange`. Store the disabled identity's existing unknown-password BCrypt hash as seed data; no runtime Java password/hash generation is needed. The original employee Datafaker generator continues supplying statements to Liquibase, which performs the writes.
 - Final `clean verify` passed with eleven tests. Clean packaging removes the retired SQL resources and Java reference-seeder class rather than carrying stale build output forward. The compatibility regression covers all nine legacy checksums and confirms migration history and edited data remain intact.
 - Packaged application also reopened a real database created by the previous SQL/custom-seed build: Liquibase reported zero changes run and thirteen previously run, with the edited employee and original history retained. Package inspection confirmed there are no `.sql` changelog resources or `ReferenceDataSeedChange.class` in the application archive.
+
+## Database-backed HR browser sign-in — 25 October 2026
+
+- Implement the first login increment through Spring Security's existing browser form. `HrUserDetailsService` loads normalized work email, password hash, role, and enabled status from `HR_USER` through `SqlUtility`. Spring performs BCrypt verification and session authentication. No custom login page/controller is added.
+- Add the user-approved local demo account `maya.rao@acme.example` with documented password `AcmeDev!2026`, stored only as a BCrypt hash in Liquibase YAML migration `010`. Its explicit `@demo` context is selected by default; a fresh database initialized with another context does not receive it. Context selection does not revoke a demo account already seeded into an existing database.
+- Preserve the disabled seed provenance identity. Keep application security independent of H2 console enablement and require the HR role. Use one generic browser failure message for unknown users, wrong passwords, and disabled users; unexpected authentication-service failures are logged once without credentials.
+- Observed failing tests first: database HR sign-in was unauthenticated and failure text differed from the generic message. After implementation, `clean verify` passed sixteen tests with zero failures/errors. Verification covers normalized email, generic failures, an actual browser-form HTTP session and session-ID rotation, authenticated console SQL access, console-disabled authentication, fresh-database demo exclusion, schema constraints, existing-database compatibility, and employee persistence.
+
+## Authentication API tests: red phase — 25 October 2026
+
+- Add contract-based tests for all four authentication APIs before implementing their routes. Keep request validation, credentials, session/CSRF lifecycle and error behavior tied to the saved contract. Do not weaken assertions, disable tests or alter the contract to accommodate the existing browser-only login.
+- Add fourteen isolated unit regression cases for the existing user lookup and browser failure handler, separately from the Spring MVC/security API suite. Pure unit tests do not start Spring or H2; security-chain/session behavior uses integration tests.
+- Observed red phase: all twenty-nine API cases fail on absent routes/JSON behavior, with zero setup/test errors. Existing browser/schema/persistence coverage remains green. Full `mvn test` result: fifty-nine cases, thirty passing, twenty-nine failures, zero errors/skips.
+- No authentication API implementation was added in this step. The next TDD increment starts with anonymous CSRF issuance, makes its cases green, and proceeds through login, current-user and logout behavior with regression checks after each change.
+
+### Interpretation of the authentication test results
+
+The 30 passing cases cover existing code: nine user-details unit cases, five browser-failure-handler unit cases, and sixteen existing browser/database regression cases. All 29 new JSON authentication API cases fail. The full Maven run is a failed build, not an API implementation success. Commands, test boundaries, and the observed 59-case result are recorded in [the testing strategy](testing-strategy.md#authentication-test-results--25-october-2026). No new API passing result is claimed.
+
+## CSRF API implementation — 25 October 2026
+
+- Implement the approved CSRF increment with typed token/error DTOs, a dedicated bodyless-request validator, the requested controller error-list/try/catch pattern, and an authentication service interface whose default method throws `UnimplementedMethodException`.
+- Scope the new security chain and request metadata filter to `/api/auth/**`; use session-backed CSRF, header-only API token resolution, disabled saved-request caching, no-store, server-generated request IDs and JSON security errors. Instantiate the filter only in that chain to avoid servlet-wide double registration. Keep browser/H2 security separate.
+- Share the JSON error writer between security filters and MVC advice. Unexpected failures are logged through SLF4J at the handling boundary with the response request ID; validation/security rejections do not log submitted values. Re-throw unrelated MVC negotiation/method exceptions to preserve their existing handling.
+- TDD evidence: anonymous CSRF issuance initially returned 401 instead of 200; all eight new request/token tests also failed before implementation. The focused nine-case run then passed. Add a saved-request regression check and strengthen actual header-token use and the authenticated-session fixture.
+- Final full run: 68 tests, 43 passing, 25 failing, zero errors/skips. All 30 existing regressions remain green. Nine CSRF tests and four original contract cases pass. The remaining login/current-user/logout behavior stays red; the full build still fails. No database migration or seed modification was needed for CSRF.
+
+## Responsibility packages — 25 October 2026
+
+Move the flat authentication classes into `rest`, `service`, `impl`, `bean`, `util`, `validator`, `filter`, `handler`, `exception`, and `config` packages; mirror the related test packages and update documentation links. Move shared SQL/exception classes into `util`/`exception`. Class bodies remain unchanged; only package declarations/imports and physical paths change. A clean test run retains the same 68 cases, 43 passes and the identical 25 pending-API failures, with zero errors/skips.
+
+## JSON login, current-user and logout — 25 October 2026
+
+- Implement Spring-owned form authentication at `/api/auth/login` and POST-only logout, with JSON handlers and session-backed CSRF rotation. Validate request shape after CSRF but before Spring authentication/logout mutates sessions. Bound actual encoded bytes to 4,096, strictly decode UTF-8 form fields, and retain dedicated validation plus the requested controller/service pattern.
+- Implement `/me` with a fresh account read and session invalidation on missing/disabled/non-HR access. Add native Liquibase migration `011` for opaque public user IDs and 255-character password hashes; retain the HR-only database constraint and existing accounts/seed history.
+- Use synchronized rolling attempt windows by normalized email/servlet client IP, configurable limits and injected clock. Validation/CSRF/dependency failures do not count as bad credentials. Success clears the pair's failures.
+- Retain legacy BCrypt hashes and choose PBKDF2 for newly encoded passwords to honor 128 characters without truncation. Tests first observed BCrypt encode failures on long ASCII/multibyte passwords; both formats now verify through the configured encoder.
+- Reuse Spring password checks, pre-session HR permission verification, fixation protection and logout cleanup. Shared JSON errors carry the request ID; API MDC supplies it to framework internal-authentication error logs. Dependency errors return safe 503 responses.
+- Observed first red checks: login/current-user/logout returned 401/404 rather than 200/204, and new limiter/password cases failed. The original 29 API cases then all passed. The final `clean verify` passed 81 tests with zero failures/errors/skips and packaged the backend, including eight real HTTP tests. Preserve the documented limits of the verification rather than claiming a deployed HTTPS or timed-expiry test.

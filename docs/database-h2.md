@@ -16,7 +16,7 @@ Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yam
 
 | Table | Seed and purpose |
 |---|---|
-| `HR_USER` | One disabled `seed@acme.example` provenance identity named `Demo Data Seed`; stores a fixed BCrypt hash of an unknown random value, declared in the YAML seed. It is not the Spring development login. |
+| `HR_USER` | One disabled `seed@acme.example` provenance identity named `Demo Data Seed`; stores a fixed BCrypt hash of an unknown random value, declared in the YAML seed. The `demo` Liquibase context also adds enabled HR account `maya.rao@acme.example`. |
 | `CURRENCY` | `INR`, `USD`, `GBP`, `EUR`, `SGD`, each with two fraction digits |
 | `EMPLOYEE` | 10,000 Datafaker records with current salary, immutable initial salary baseline, employment dates, version/timestamps, currency and creation-actor links |
 | `SALARY_CHANGE` | Initially empty; holds subsequent changes, actor snapshots, effective dates, resulting versions and retry metadata |
@@ -33,11 +33,11 @@ The conversion of migrations `005`–`009` retains each original ID, author, and
 
 Liquibase owns connection and transaction handling for generated insert statements and tracks completed changes in `DATABASECHANGELOG`. Restarting does not repeat the seed or overwrite saved edits. Add new changesets instead of editing applied ones.
 
-Spring Security's current development login remains username `user` with the generated startup password. The former `/api/sample` greeting endpoint was removed with its hello-world table.
+Spring Security now reads users from `HR_USER`. The local demo account is `maya.rao@acme.example` with password `AcmeDev!2026`; Liquibase stores its BCrypt hash in the `010` YAML seed. Browser sign-in uses Spring's existing form, with normalized email and generic credential failures. The temporary generated-password account is replaced by database authentication. The former `/api/sample` greeting endpoint was removed with its hello-world table.
 
 ## Browser console
 
-Restart the backend, then open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). First sign in with Spring's development username `user` and the generated startup password. On the H2 connection form enter:
+Restart the backend, then open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). First sign in with email `maya.rao@acme.example` and password `AcmeDev!2026`. On the H2 connection form enter:
 
 | Field | Value |
 |---|---|
@@ -72,3 +72,9 @@ The employee schema uses `DECIMAL(19,4)`; generated salary amounts use `BigDecim
 References: [H2 features](https://h2database.github.io/html/features.html), [Spring database initialization](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html), [Liquibase configuration](https://contribute.liquibase.com/extensions-integrations/directory/integration-docs/springboot/configuration/).
 
 Implementation references: [Datafaker repeatable randomness](https://www.datafaker.net/documentation/usage/), [Liquibase custom changes](https://docs.liquibase.com/community/reference-guide-5-0-2/change-types/customchange).
+
+## Authentication account migration
+
+Migration `011` adds a stable unique `public_id` UUID to each HR account and widens `password_hash` to 255 characters. Existing identities, enabled states, password hashes and employee links are preserved. API responses expose the public UUID rather than the internal numeric primary key.
+
+Existing demo/seed hashes remain BCrypt. New encoding uses PBKDF2 for the documented 128-character password limit; BCrypt candidate values beyond its 72-byte limit are rejected rather than truncated. All schema/seed changes remain Liquibase-managed.

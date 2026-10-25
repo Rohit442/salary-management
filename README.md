@@ -2,7 +2,9 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables (`HR_USER`, `CURRENCY`, `EMPLOYEE`, `SALARY_CHANGE`), Liquibase migrations, first-run Datafaker seeding of 10,000 employees, and the authenticated local H2 console. Salary-management APIs, database-backed HR sign-in/provisioning, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables, Liquibase migrations, 10,000 seeded employees, database-backed HR browser sign-in, the local H2 console, and all four JSON authentication APIs. Salary-management APIs, non-demo HR provisioning, CI, and deployment are pending.
+
+The latest local Maven `clean verify` passed **81 tests with zero failures/errors/skips** and packaged the backend. This includes all 29 original auth contract cases and eight real HTTP cases. Test databases and random-port servers are isolated from your running application on port 8080.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -28,7 +30,20 @@ Liquibase creates the ER schema, seeds five currencies and a disabled employee-s
 
 Existing databases are upgraded in place without rerunning the employee seed or overwriting employee edits. The hello-world table and `/api/sample` endpoint have been retired. Tests use separate databases with a 20-employee fixture; the upgrade/restart test preserves the full 10,000-record dataset. See [H2 schema and migration details](docs/database-h2.md).
 
-To browse tables while the backend runs, open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). Sign in with `user` and the generated startup password, then connect using the default H2 JDBC URL, username `sa`, and an empty database password. [Console connection details](docs/database-h2.md#browser-console). Set `H2_CONSOLE_ENABLED=false` outside local development.
+To browse tables while the backend runs, open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). Sign in with `maya.rao@acme.example` and the local demo password `AcmeDev!2026`, then connect using the default H2 JDBC URL, username `sa`, and an empty database password. [Console connection details](docs/database-h2.md#browser-console). Set `H2_CONSOLE_ENABLED=false` outside local development.
+
+### Development HR sign-in
+
+Restart the backend and open [http://localhost:8080/login](http://localhost:8080/login), or open the H2 console and follow its sign-in redirect.
+
+| Field | Local demo value |
+|---|---|
+| Username / work email | `maya.rao@acme.example` |
+| Password | `AcmeDev!2026` |
+
+Spring Security authenticates against `HR_USER` using stored password hashes. Existing BCrypt hashes remain supported; newly encoded passwords use PBKDF2 to support the full 128-character contract without truncation. The `010` Liquibase YAML seed creates the enabled demo account once; the existing seed audit actor remains disabled. Email is matched after trimming and lowercasing. Wrong passwords, unknown emails, and disabled users show the same failure message. Successful browser sign-in uses a server session and rotates its ID.
+
+The default Liquibase context is `demo`. For a fresh database without the demo account, set `LIQUIBASE_CONTEXTS=production` before initialization and provision real accounts separately. Changing the context on a database that already contains the demo account does not remove or disable it. Application authentication remains enabled when the H2 console is disabled.
 
 From `backend/`, use the supplied Maven wrapper:
 
@@ -38,6 +53,31 @@ From `backend/`, use the supplied Maven wrapper:
 | `./mvnw spring-boot:run` | Start the backend with the configured H2 connection |
 
 On Windows, use `mvnw.cmd` in place of `./mvnw`.
+
+## Authentication APIs and tests
+
+Import [the Postman collection](docs/postman/acme-auth.postman_collection.json), keep cookies enabled, and run requests 01–05 in order. It includes the local demo variables and saves/refreshes the CSRF token automatically.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/api/auth/csrf` | Anonymous session-backed CSRF token |
+| POST | `/api/auth/login` | Form-encoded email/password; JSON HR identity and session |
+| GET | `/api/auth/me` | Current HR identity, with live enabled/role checks |
+| POST | `/api/auth/logout` | Session invalidation, expired cookie, empty 204 response |
+
+Restart the backend after the code changes. Follow the complete cookie-jar/curl flow in [the authentication contract](docs/api-auth.md#3-shared-curl-setup), using the local demo credentials above. Send the initial token and its cookie when logging in; fetch a fresh token after login for subsequent writes and logout.
+
+From `backend/`:
+
+```sh
+./mvnw -Dtest=AuthenticationApiContractTest test
+./mvnw -Dtest=AuthenticationHttpTests test
+./mvnw clean verify
+```
+
+The contract suite checks all four routes, JSON errors, validation, CSRF/session rotation, revocation and attempt limiting. HTTP tests additionally exercise raw/chunked form bodies, malformed UTF-8/escaping, 4,096/4,097-byte limits, cookies, and stale-session rejection. Password and rolling-window limiter rules also have isolated unit tests with a controllable clock.
+
+Configuration: `AUTH_IDLE_TIMEOUT_SECONDS` (1800), `AUTH_MAXIMUM_FAILURES` (5), `AUTH_ATTEMPT_WINDOW_SECONDS` (900), and `SESSION_COOKIE_SECURE` (false locally; true for HTTPS deployment). Client IP comes from the servlet container; arbitrary forwarded headers are not read by the limiter.
 
 ## Project documentation
 

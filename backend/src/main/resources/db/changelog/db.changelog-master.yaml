@@ -51,3 +51,7 @@ databaseChangeLog:
       file: db/changelog/008-create-salary-change.yaml
   - include:
       file: db/changelog/009-retire-sample-message.yaml
+  - include:
+      file: db/changelog/010-seed-demo-hr-user.yaml
+  - include:
+      file: db/changelog/011-auth-account-identity.yaml

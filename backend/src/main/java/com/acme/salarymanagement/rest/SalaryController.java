@@ -61,6 +61,20 @@ public class SalaryController {
         } catch(ApiRequestException exception) { throw exception; }
         catch(IOException | RuntimeException exception) { throw new ApiOperationException(exception); }
     }
+    @GetMapping(value="/base-pay-estimate",produces="application/json")
+    public ResponseEntity<BasePayEstimate> estimate(@PathVariable String employeeId,HttpServletRequest request,Authentication user) {
+        List<ApiFieldError> errors;
+        try {
+            authorize(request,user);
+            errors=validator.validateEstimate(request,employeeId);
+            if(errors.isEmpty()) {
+                BasePayEstimate response=service.estimate(employeeId,java.time.YearMonth.parse(request.getParameter("month")));
+                return ResponseEntity.ok(response);
+            }
+            throw invalid(errors);
+        } catch(ApiRequestException exception) { throw exception; }
+        catch(IOException | RuntimeException exception) { throw new ApiOperationException(exception); }
+    }
     private void authorize(HttpServletRequest request,Authentication user) {
         try { auth.currentUser(user.getName(),sessions.idleTimeoutSeconds(request)); }
         catch(ApiRequestException exception) {

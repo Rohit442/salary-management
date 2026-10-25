@@ -125,6 +125,39 @@ public class SalaryServiceImpl implements SalaryService {
             return new SalaryHistoryPage(id,items,page,size,items.size(),total,pages,new EmployeePage.Sort("changedAt","desc"),page>0,page+1L<pages);
         } catch(DataAccessException exception) { throw unavailable(exception); }
     }
+    @Override
+    @Transactional(readOnly=true,isolation=Isolation.SERIALIZABLE)
+    public BasePayEstimate estimate(String id,java.time.YearMonth month) {
+        try {
+            Employee employee=employee(id,false);
+            LocalDate start=month.atDay(1),end=month.atEndOfMonth();
+            LocalDate eligibleStart=employee.joining().isAfter(start)?employee.joining():start;
+            LocalDate eligibleEnd=employee.leaving()!=null && employee.leaving().isBefore(end)?employee.leaving():end;
+            int days=eligibleEnd.isBefore(eligibleStart)?0:(int)java.time.temporal.ChronoUnit.DAYS.between(eligibleStart,eligibleEnd)+1;
+            LocalDate coverage=employee.initialEffective().withDayOfMonth(1);
+            if(coverage.isBefore(employee.joining())) coverage=employee.joining();
+            BasePayEstimate.SalaryBasis basis=null;
+            String estimated=money(BigDecimal.ZERO,employee.precision());
+            if(days>0) {
+                if(eligibleStart.isBefore(coverage)) throw conflict("SALARY_HISTORY_INCOMPLETE","Recorded salary history does not cover all eligible days.");
+                var changes=sql.query("""
+                        SELECT public_id,new_amount,effective_date FROM salary_change
+                        WHERE employee_fk=? AND effective_date<=? ORDER BY effective_date DESC,id DESC FETCH FIRST 1 ROW ONLY
+                        """,(row,index)->new BasePayEstimate.SalaryBasis("SALARY_CHANGE","chg-"+row.getString("public_id"),
+                        row.getObject("effective_date",LocalDate.class),money(row.getBigDecimal("new_amount"),employee.precision()),
+                        row.getBigDecimal("new_amount").divide(BigDecimal.valueOf(12),employee.precision(),RoundingMode.HALF_UP).toPlainString()),employee.id(),end);
+                basis=changes.isEmpty()?new BasePayEstimate.SalaryBasis("INITIAL",null,employee.initialEffective(),money(employee.initialSalary(),employee.precision()),
+                        employee.initialSalary().divide(BigDecimal.valueOf(12),employee.precision(),RoundingMode.HALF_UP).toPlainString()):changes.getFirst();
+                BigDecimal annual=new BigDecimal(basis.annualBaseSalary());
+                estimated=annual.multiply(BigDecimal.valueOf(days)).divide(BigDecimal.valueOf(12L*month.lengthOfMonth()),employee.precision(),RoundingMode.HALF_UP).toPlainString();
+            }
+            var generated=clock.instant();
+            LocalDate today=generated.atOffset(ZoneOffset.UTC).toLocalDate();
+            return new BasePayEstimate(id,employee.version(),month.toString(),employee.currency(),"CALENDAR_DAYS",employee.joining(),employee.leaving(),
+                    coverage,month.lengthOfMonth(),days,basis,estimated,month.isAfter(java.time.YearMonth.from(today)),today,generated);
+        } catch(DataAccessException exception) { throw unavailable(exception); }
+    }
+
     private SalaryChangeResponse change(ResultSet row,int index) throws SQLException {
         int precision=row.getInt("fraction_digits");
         return new SalaryChangeResponse("chg-"+row.getString("public_id"),row.getString("employee_id"),money(row.getBigDecimal("previous_amount"),precision),

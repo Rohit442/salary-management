@@ -28,6 +28,17 @@ public class SalaryRequestValidator {
         }
         return errors;
     }
+    public List<ApiFieldError> validateEstimate(HttpServletRequest request,String id) throws IOException {
+        if(request.getInputStream().read()!=-1) throw new ApiRequestException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,"UNSUPPORTED_MEDIA_TYPE","This endpoint does not accept a body.",List.of());
+        List<ApiFieldError> errors=new ArrayList<>();
+        if(!id.matches("EMP-[0-9]{6}")) errors.add(new ApiFieldError("employeeId","INVALID_FORMAT","Use EMP- followed by six digits."));
+        for(String field:request.getParameterMap().keySet()) if(!field.equals("month")) errors.add(new ApiFieldError(field,"INVALID_PARAMETER","Unexpected query parameter."));
+        String[] months=request.getParameterValues("month");
+        try {
+            if(months==null || months.length!=1 || !months[0].matches("[0-9]{4}-[0-9]{2}") || java.time.YearMonth.parse(months[0]).getYear()<1) throw new IllegalArgumentException();
+        } catch(RuntimeException exception) { errors.add(new ApiFieldError("month","INVALID_FORMAT","Supply exactly one valid YYYY-MM month.")); }
+        return errors;
+    }
     public List<ApiFieldError> validateKey(HttpServletRequest request) {
         var keys=Collections.list(request.getHeaders("Idempotency-Key"));
         return keys.size()==1 && keys.getFirst().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}") ? List.of()

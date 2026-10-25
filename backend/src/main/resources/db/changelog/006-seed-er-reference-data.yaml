@@ -2,6 +2,85 @@ databaseChangeLog:
   - changeSet:
       id: 006-seed-er-reference-data
       author: salary-management
+      # Accept the recorded checksum of the former Liquibase Java custom change.
+      validCheckSum:
+        - "9:88aa3c523394f2e376ca75102806202e"
       changes:
-        - customChange:
-            class: com.acme.salarymanagement.seed.ReferenceDataSeedChange
+        - insert:
+            tableName: hr_user
+            columns:
+              - column:
+                  name: work_email
+                  value: seed@acme.example
+              - column:
+                  name: password_hash
+                  value: "{bcrypt}$2a$10$fo5iW.ZUtX/RCJcPShfni.7tquBSMmKYOL0qRVmRRhZujY251XlcS"
+              - column:
+                  name: display_name
+                  value: Demo Data Seed
+              - column:
+                  name: role
+                  value: HR
+              - column:
+                  name: enabled
+                  valueBoolean: false
+        - insert:
+            tableName: currency
+            columns:
+              - column:
+                  name: code
+                  value: INR
+              - column:
+                  name: fraction_digits
+                  valueNumeric: 2
+              - column:
+                  name: name
+                  value: Indian Rupee
+        - insert:
+            tableName: currency
+            columns:
+              - column:
+                  name: code
+                  value: USD
+              - column:
+                  name: fraction_digits
+                  valueNumeric: 2
+              - column:
+                  name: name
+                  value: US Dollar
+        - insert:
+            tableName: currency
+            columns:
+              - column:
+                  name: code
+                  value: GBP
+              - column:
+                  name: fraction_digits
+                  valueNumeric: 2
+              - column:
+                  name: name
+                  value: Pound Sterling
+        - insert:
+            tableName: currency
+            columns:
+              - column:
+                  name: code
+                  value: EUR
+              - column:
+                  name: fraction_digits
+                  valueNumeric: 2
+              - column:
+                  name: name
+                  value: Euro
+        - insert:
+            tableName: currency
+            columns:
+              - column:
+                  name: code
+                  value: SGD
+              - column:
+                  name: fraction_digits
+                  valueNumeric: 2
+              - column:
+                  name: name
+                  value: Singapore Dollar

@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: "009-retire-sample-message"
+      author: "salary-management"
+      logicalFilePath: "db/changelog/009-retire-sample-message.sql"
+      # Accept only the recorded checksum of the original SQL migration.
+      validCheckSum:
+        - "9:d57dc8e50d5bed9913831a0b39c6db7e"
+      changes:
+        - dropTable:
+            tableName: "sample_message"

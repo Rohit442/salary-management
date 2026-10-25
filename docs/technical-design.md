@@ -37,7 +37,7 @@ The browser never connects directly to H2. Backend access checks are authoritati
 | Backend | Spring Boot, Spring Web, Spring Data JPA, Spring Security, Bean Validation |
 | Frontend | AngularJS, with a compatible component library and locally built assets |
 | Database | H2; persistent H2 for local development |
-| Migrations | Liquibase; Hibernate validates the resulting schema |
+| Migrations | Liquibase YAML changelogs; Hibernate validates the resulting schema |
 | Authentication | Pre-provisioned named HR accounts and server-side sessions |
 | Tests | Unit tests, Spring integration tests against H2, and Playwright workflows |
 

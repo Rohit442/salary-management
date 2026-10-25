@@ -16,7 +16,7 @@ Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yam
 
 | Table | Seed and purpose |
 |---|---|
-| `HR_USER` | One disabled `seed@acme.example` provenance identity named `Demo Data Seed`; stores a randomly generated, BCrypt-hashed unknown password. It is not the Spring development login. |
+| `HR_USER` | One disabled `seed@acme.example` provenance identity named `Demo Data Seed`; stores a fixed BCrypt hash of an unknown random value, declared in the YAML seed. It is not the Spring development login. |
 | `CURRENCY` | `INR`, `USD`, `GBP`, `EUR`, `SGD`, each with two fraction digits |
 | `EMPLOYEE` | 10,000 Datafaker records with current salary, immutable initial salary baseline, employment dates, version/timestamps, currency and creation-actor links |
 | `SALARY_CHANGE` | Initially empty; holds subsequent changes, actor snapshots, effective dates, resulting versions and retry metadata |
@@ -24,6 +24,12 @@ Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yam
 Migrations `005`–`009` add reference tables/data, complete the existing employee table, create salary history, and remove `SAMPLE_MESSAGE`. Applied migrations `001`–`004` are unchanged for compatibility. The original employee seed remains a recorded, one-time Liquibase change; the later schema migration attaches its rows to the currency and provenance records. No employees are copied into another table or regenerated during upgrade.
 
 The employee table enforces unique normalized email/employee IDs, positive amounts, valid date ordering, and creator/currency foreign keys. Field sizes match the employee contract, including 200-character names and job titles. Salary history enforces actor and employee/currency relationships, positive changed amounts, unique actor/retry keys, and unique employee effective dates/resulting versions. Its history index supports employee/time/ID ordering. Foreign keys preserve referenced records rather than cascading deletion.
+
+HR-user and currency seed records are native YAML `insert` changes; their Java custom seeder has been removed. Datafaker employee generation remains in a Liquibase-managed custom change that returns insert statements; Liquibase executes them and manages their transaction.
+
+All changelog files are YAML. Table/column definitions, foreign keys, uniqueness, indexes, updates, and table removal use native Liquibase YAML changes. Check constraints use inline `sql` blocks because the native [`addCheckConstraint` change requires Liquibase Secure](https://docs.liquibase.com/secure/reference-guide-6-0/change-types/addcheckconstraint); the creator backfill uses a computed lookup expression.
+
+The conversion of migrations `005`–`009` retains each original ID, author, and logical file path and accepts its exact recorded checksum, including the previous Java custom seed checksum for `006`. `DATABASECHANGELOG` therefore still shows historical `.sql` logical names, while the actual files and master includes use `.yaml`. Existing migration history and data remain intact without rerunning those changes.
 
 Liquibase owns connection and transaction handling for generated insert statements and tracks completed changes in `DATABASECHANGELOG`. Restarting does not repeat the seed or overwrite saved edits. Add new changesets instead of editing applied ones.
 

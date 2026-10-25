@@ -8,7 +8,7 @@ Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-sco
 
 ## Planned application stack
 
-Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **H2**, using versioned Liquibase changelogs. Local runs retain data in a file; tests use isolated databases. See the [product requirements](docs/requirements.md) and [H2 database setup guidance](docs/database-h2.md).
+Java with Spring Boot, Spring Data JPA, Spring Security, AngularJS, and **H2**, using versioned Liquibase YAML changelogs. Local runs retain data in a file; tests use isolated databases. See the [product requirements](docs/requirements.md) and [H2 database setup guidance](docs/database-h2.md).
 
 ## Backend setup in IntelliJ IDEA
 

@@ -42,12 +42,12 @@ databaseChangeLog:
               - name: employeeCount
                 value: ${employeeCount}
   - include:
-      file: db/changelog/005-create-er-reference-tables.sql
+      file: db/changelog/005-create-er-reference-tables.yaml
   - include:
       file: db/changelog/006-seed-er-reference-data.yaml
   - include:
-      file: db/changelog/007-complete-employee-schema.sql
+      file: db/changelog/007-complete-employee-schema.yaml
   - include:
-      file: db/changelog/008-create-salary-change.sql
+      file: db/changelog/008-create-salary-change.yaml
   - include:
-      file: db/changelog/009-retire-sample-message.sql
+      file: db/changelog/009-retire-sample-message.yaml

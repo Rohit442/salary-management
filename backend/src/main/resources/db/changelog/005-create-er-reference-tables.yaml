@@ -1,0 +1,88 @@
+databaseChangeLog:
+  - changeSet:
+      id: "005-create-hr-user"
+      author: "salary-management"
+      logicalFilePath: "db/changelog/005-create-er-reference-tables.sql"
+      # Accept only the recorded checksum of the original SQL migration.
+      validCheckSum:
+        - "9:5e3a971299c9cf8c1527224a90155f0a"
+      changes:
+        - createTable:
+            tableName: "hr_user"
+            columns:
+              - column:
+                  name: "id"
+                  type: "BIGINT"
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: "work_email"
+                  type: "VARCHAR(254)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "password_hash"
+                  type: "VARCHAR(100)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "display_name"
+                  type: "VARCHAR(200)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "role"
+                  type: "VARCHAR(20)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "enabled"
+                  type: "BOOLEAN"
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: "hr_user"
+            columnNames: "work_email"
+            constraintName: "uq_hr_user_email"
+        - sql:
+            sql: "ALTER TABLE hr_user ADD CONSTRAINT ck_hr_user_email CHECK (work_email = LOWER(TRIM(work_email)) AND CHAR_LENGTH(work_email) > 0)"
+        - sql:
+            sql: "ALTER TABLE hr_user ADD CONSTRAINT ck_hr_user_display_name CHECK (CHAR_LENGTH(TRIM(display_name)) > 0)"
+        - sql:
+            sql: "ALTER TABLE hr_user ADD CONSTRAINT ck_hr_user_role CHECK (role = 'HR')"
+  - changeSet:
+      id: "005-create-currency"
+      author: "salary-management"
+      logicalFilePath: "db/changelog/005-create-er-reference-tables.sql"
+      # Accept only the recorded checksum of the original SQL migration.
+      validCheckSum:
+        - "9:8c87c42dc6411c56cc97d864d92996f8"
+      changes:
+        - createTable:
+            tableName: "currency"
+            columns:
+              - column:
+                  name: "code"
+                  type: "CHAR(3)"
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: "fraction_digits"
+                  type: "SMALLINT"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "name"
+                  type: "VARCHAR(100)"
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: "ALTER TABLE currency ADD CONSTRAINT ck_currency_code CHECK (REGEXP_LIKE(code, '^[A-Z]{3}$'))"
+        - sql:
+            sql: "ALTER TABLE currency ADD CONSTRAINT ck_currency_precision CHECK (fraction_digits BETWEEN 0 AND 4)"
+        - sql:
+            sql: "ALTER TABLE currency ADD CONSTRAINT ck_currency_name CHECK (CHAR_LENGTH(TRIM(name)) > 0)"

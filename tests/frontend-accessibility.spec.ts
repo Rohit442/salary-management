@@ -33,6 +33,41 @@ test('keyboard skip link focuses main content without changing the page', async 
   await expect(page).toHaveURL(/#!\/reports$/);
 });
 
+test('ACME brand returns to Employees by keyboard and click', async ({ page }) => {
+  await page.goto(`${frontendUrl}/#!/reports`);
+  await expect(page.getByRole('heading', { name: 'Compensation reports' })).toBeVisible();
+  const brand = page.getByRole('link', { name: 'ACME', exact: true });
+  await expect(brand).toBeVisible();
+  await expect(brand).toHaveAttribute('href', '#!/employees');
+  await page.getByRole('link', { name: 'Skip to content' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(brand).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Employee directory', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/#!\/employees$/);
+  await page.getByRole('link', { name: 'Reports', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Compensation reports' })).toBeVisible();
+  await brand.click();
+  await expect(page.getByRole('heading', { name: 'Employee directory', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/#!\/employees$/);
+});
+
+test('mobile ACME brand returns to Employees and closes navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${frontendUrl}/#!/reports`);
+  await expect(page.getByRole('heading', { name: 'Compensation reports' })).toBeVisible();
+  const menu = page.getByRole('button', { name: 'Toggle navigation' });
+  await menu.click();
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  const brand = page.getByRole('link', { name: 'ACME', exact: true });
+  await expect(brand).toBeVisible();
+  await brand.click();
+  await expect(page.getByRole('heading', { name: 'Employee directory', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/#!\/employees$/);
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.sidebar-scrim')).toHaveCount(0);
+});
+
 test('mobile navigation opens and closes when switching pages', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${frontendUrl}/#!/employees`);

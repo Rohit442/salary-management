@@ -215,3 +215,14 @@ Move the flat authentication classes into `rest`, `service`, `impl`, `bean`, `ut
 - Return the immutable baseline amount/currency/effective date on every history page, including empty, inactive and past-end pages. Read the original recording timestamp and creator-name snapshot from the employee, and expose the creator's public ID. Keep these reads in the existing serializable transaction. No salary data or database schema changes are required.
 - TDD evidence: all four new isolated-H2 cases initially failed for missing `initialSalary`; the new live Playwright check displayed `— / year` instead of the seeded amount. The focused backend run passed all 29 cases after adding the response mapping. The browser regression also checks that a subsequent salary update changes the current salary while preserving the initial salary.
 - Final verification: all 208 backend tests passed; the three existing live browser workflows passed and the new real-API history workflow passed after correcting its field selectors. The new workflow verifies initial salary, original effective/recording dates and creator, then saves a salary update in an isolated database and confirms the original baseline remains unchanged. The table layout and production salary records were not modified.
+
+### Salary update field validation — 2026-10-26
+
+- Validate annual base salary and effective date when focus leaves their fields, displaying linked inline errors without moving focus. Editing clears the affected error; Save revalidates both fields, including keyboard submission. Preserve invalid draft text so users can correct it.
+- Require a positive plain-decimal salary with at most two fractional digits, retaining the backend's 15-digit integer limit and any stricter currency precision. Check real calendar dates, the latest salary date, today and employment bounds. Keep the backend as the authority for concurrent changes; accepting a refreshed conflict record revalidates the preserved draft, while uncertain retries keep their original request.
+- TDD evidence: separate date and amount blur checks first failed because their inline errors remained hidden. All 22 new Playwright cases then passed, followed by all 90 frontend fixture/render/security checks, all 29 unit tests and the production build. No backend or database changes were needed.
+
+### Workspace home link — 2026-10-26
+
+- Make the signed-in sidebar's ACME logo/name a normal link to Employees, the existing authenticated landing page. Preserve its appearance and existing directory state restoration.
+- Two Playwright checks first failed for the missing link, then passed for desktop keyboard/click navigation and mobile navigation/menu closure. The production build and all four isolated live-API workflows passed after this change. Combined frontend coverage is 92 fixture/render/security checks plus four live workflows.

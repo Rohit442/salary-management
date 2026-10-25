@@ -1,4 +1,5 @@
 import { formatDateTime } from '../util/format.mjs';
+import { validateSalaryAmount, validateSalaryEffectiveDate } from '../validator/salary.mjs';
 
 const employeePath = id => `/employees/${encodeURIComponent(id)}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -182,13 +183,13 @@ const salaryTemplate = `
         <button type="button" class="btn btn-secondary" ng-click="$ctrl.historyReviewOpen = false">Close history</button>
       </section>
       <div ng-if="$ctrl.needsReview" class="alert alert-info"><p>Your draft has been preserved. Review the latest record before saving again.</p><button type="button" class="btn btn-secondary" ng-click="$ctrl.review()" ng-disabled="$ctrl.reviewLoading">Review latest record</button></div>
-      <div class="review-panel" ng-if="$ctrl.latest"><h3>Current employee record</h3><dl class="review-list"><div><dt>Current annual salary</dt><dd>{{$ctrl.latest.annualBaseSalary | formatMoney:$ctrl.latest.currency}}</dd></div><div><dt>Latest effective date</dt><dd>{{$ctrl.latest.salaryEffectiveFrom | formatDate}}</dd></div><div><dt>Status</dt><dd>{{$ctrl.latest.employmentStatus}}</dd></div><div><dt>Joining / last employment</dt><dd>{{$ctrl.latest.joiningDate | formatDate}} / {{$ctrl.latest.lastEmploymentDate ? ($ctrl.latest.lastEmploymentDate | formatDate) : 'Open-ended'}}</dd></div></dl><p ng-if="$ctrl.uncertain" class="muted">This is current data, not confirmation of the original request. Retry the original change to confirm its recorded outcome.</p><button ng-if="!$ctrl.uncertain" type="button" class="btn btn-secondary" ng-click="$ctrl.acceptReview()">I’ve reviewed this record; keep my draft</button></div>
+      <div class="review-panel" ng-if="$ctrl.latest"><h3>Current employee record</h3><dl class="review-list"><div><dt>Current annual salary</dt><dd>{{$ctrl.latest.annualBaseSalary | formatMoney:$ctrl.latest.currency}}</dd></div><div><dt>Latest effective date</dt><dd>{{$ctrl.latest.salaryEffectiveFrom | formatDate}}</dd></div><div><dt>Status</dt><dd>{{$ctrl.latest.employmentStatus}}</dd></div><div><dt>Joining / last employment</dt><dd>{{$ctrl.latest.joiningDate | formatDate}} / {{$ctrl.latest.lastEmploymentDate ? ($ctrl.latest.lastEmploymentDate | formatDate) : 'Open-ended'}}</dd></div></dl><p ng-if="$ctrl.uncertain" class="muted">This is current data, not confirmation of the original request. Retry the original change to confirm its recorded outcome.</p><button ng-if="!$ctrl.uncertain" type="button" class="btn btn-secondary" ng-click="$ctrl.acceptReview(salaryForm)">I’ve reviewed this record; keep my draft</button></div>
       <fieldset ng-disabled="$ctrl.saving || $ctrl.uncertain || $ctrl.employee.employmentStatus === 'INACTIVE'">
-        <div class="salary-amount-row"><div class="field"><label for="annualBaseSalary">Annual base salary <span aria-hidden="true">*</span></label><input id="annualBaseSalary" name="annualBaseSalary" type="text" inputmode="decimal" ng-model="$ctrl.draft.annualBaseSalary" pattern="[0-9]+(\\.[0-9]+)?" required aria-describedby="salary-hint"><span class="field-error">{{$ctrl.fieldError('annualBaseSalary')}}</span></div><div class="field"><label for="salary-currency">Currency</label><input id="salary-currency" ng-value="$ctrl.employee.currency" readonly></div></div>
+        <div class="salary-amount-row"><div class="field"><label for="annualBaseSalary">Annual base salary <span aria-hidden="true">*</span></label><input id="annualBaseSalary" name="annualBaseSalary" type="text" inputmode="decimal" ng-model="$ctrl.draft.annualBaseSalary" ng-model-options="{ allowInvalid: true }" ng-blur="$ctrl.validateField('annualBaseSalary', salaryForm.annualBaseSalary)" ng-change="$ctrl.clearValidation('annualBaseSalary', salaryForm.annualBaseSalary)" pattern="[0-9]+(\\.[0-9]+)?" required aria-describedby="salary-hint salary-amount-error" aria-invalid="{{$ctrl.fieldError('annualBaseSalary') ? 'true' : 'false'}}"><span id="salary-amount-error" class="field-error" aria-live="polite">{{$ctrl.fieldError('annualBaseSalary')}}</span></div><div class="field"><label for="salary-currency">Currency</label><input id="salary-currency" ng-value="$ctrl.employee.currency" readonly></div></div>
         <p class="field-hint" id="salary-hint">Currency is fixed. Use a positive amount without commas, with up to {{$ctrl.precision}} decimal places.</p>
         <div class="field"><label for="reason">Reason for change <span aria-hidden="true">*</span></label><textarea id="reason" name="reason" rows="4" maxlength="1000" ng-model="$ctrl.draft.reason" required aria-describedby="reason-hint"></textarea><span id="reason-hint" class="field-hint">This reason will be saved in the employee’s salary history.</span><span class="field-error">{{$ctrl.fieldError('reason')}}</span></div>
-        <div class="field effective-date-field"><label for="effectiveDate">Effective from <span aria-hidden="true">*</span></label><input id="effectiveDate" name="effectiveDate" type="text" placeholder="YYYY-MM-DD" ng-model="$ctrl.draft.effectiveDate" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" required><span class="field-error">{{$ctrl.fieldError('effectiveDate')}}</span></div>
-        <p class="field-hint">Must be after {{$ctrl.employee.salaryEffectiveFrom | formatDate}}, on or before today ({{$ctrl.today | formatDate}}), and within employment dates.</p>
+        <div class="field effective-date-field"><label for="effectiveDate">Effective from <span aria-hidden="true">*</span></label><input id="effectiveDate" name="effectiveDate" type="text" placeholder="YYYY-MM-DD" ng-model="$ctrl.draft.effectiveDate" ng-model-options="{ allowInvalid: true }" ng-blur="$ctrl.validateField('effectiveDate', salaryForm.effectiveDate)" ng-change="$ctrl.clearValidation('effectiveDate', salaryForm.effectiveDate)" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" required aria-describedby="effective-date-hint effective-date-error" aria-invalid="{{$ctrl.fieldError('effectiveDate') ? 'true' : 'false'}}"><span id="effective-date-error" class="field-error" aria-live="polite">{{$ctrl.fieldError('effectiveDate')}}</span></div>
+        <p id="effective-date-hint" class="field-hint">Must be after {{$ctrl.employee.salaryEffectiveFrom | formatDate}}, on or before today ({{$ctrl.today | formatDate}}), and within employment dates.</p>
       </fieldset>
       <section class="salary-review"><h2 class="section-title">Review before saving</h2><div class="salary-comparison"><div><p class="muted">Current annual base salary</p><strong>{{$ctrl.employee.annualBaseSalary | formatMoney:$ctrl.employee.currency}}</strong></div><div><p class="muted">New annual base salary</p><strong class="text-blue">{{$ctrl.draft.annualBaseSalary ? ($ctrl.draft.annualBaseSalary | formatMoney:$ctrl.employee.currency) : 'Enter an amount'}}</strong></div></div><div class="alert alert-info"><strong>Whole-month application</strong><p>The salary selected by effective date applies to the entire month. Only joining or leaving prorates the monthly estimate.</p></div><dl class="review-list"><div><dt>Latest recorded effective date</dt><dd>{{$ctrl.employee.salaryEffectiveFrom | formatDate}}</dd></div><div><dt>Draft effective from</dt><dd>{{$ctrl.draft.effectiveDate || '—'}}</dd></div><div><dt>Joining date</dt><dd>{{$ctrl.employee.joiningDate | formatDate}}</dd></div><div><dt>Last employment date</dt><dd>{{$ctrl.employee.lastEmploymentDate ? ($ctrl.employee.lastEmploymentDate | formatDate) : 'Open-ended'}}</dd></div></dl></section>
       <div class="form-actions"><a class="btn btn-secondary" ng-href="#!/employees/{{$ctrl.id}}">Cancel</a><button class="btn btn-primary" type="submit" ng-disabled="$ctrl.saving || $ctrl.uncertain || $ctrl.needsReview || $ctrl.employee.employmentStatus !== 'ACTIVE'">{{$ctrl.saving ? 'Saving…' : 'Save salary'}}</button></div>
@@ -203,9 +204,29 @@ function SalaryController(api, $routeParams, $location, $scope, $timeout) {
   $scope.$on('$destroy', () => { if (timer) $timeout.cancel(timer); });
   vm.id = $routeParams.id || $routeParams.employeeId; vm.today = today();
   vm.draft = { annualBaseSalary: '', reason: '', effectiveDate: '' }; vm.attempts = 0;
+  vm.validationErrors = {};
+  const serverFieldError = vm.fieldError;
+  vm.fieldError = field => vm.validationErrors[field] || serverFieldError(field);
+  vm.clearValidation = (field, control) => {
+    vm.validationErrors[field] = null;
+    control.$setValidity('salaryValue', true);
+    if (vm.error?.fieldErrors?.some(issue => issue.field === field)) {
+      const fieldErrors = vm.error.fieldErrors.filter(issue => issue.field !== field);
+      vm.error = fieldErrors.length ? { ...vm.error, fieldErrors } : null;
+    }
+  };
+  vm.validateField = (field, control) => {
+    vm.today = today();
+    const error = field === 'annualBaseSalary'
+      ? validateSalaryAmount(vm.draft.annualBaseSalary, vm.precision)
+      : validateSalaryEffectiveDate(vm.draft.effectiveDate, vm.employee, vm.today);
+    vm.validationErrors[field] = error;
+    control.$setValidity('salaryValue', !error);
+    return !error;
+  };
   vm.load = async () => {
     vm.loading = true; vm.loadError = null;
-    try { const [employee, refs] = await Promise.all([api.get(employeePath(vm.id)), api.references()]); if (alive()) { vm.employee = employee; vm.precision = refs.currencies.find(item => item.code === employee.currency)?.fractionDigits; } }
+    try { const [employee, refs] = await Promise.all([api.get(employeePath(vm.id)), api.references()]); if (alive()) { vm.employee = employee; vm.precision = Math.min(2, refs.currencies.find(item => item.code === employee.currency)?.fractionDigits ?? 2); } }
     catch (error) { vm.loadError = error; }
     finally { vm.loading = false; vm.paint(); }
   };
@@ -226,6 +247,9 @@ function SalaryController(api, $routeParams, $location, $scope, $timeout) {
   };
   vm.save = form => {
     if (vm.saving || vm.uncertain || !vm.employee || vm.employee.employmentStatus !== 'ACTIVE' || vm.needsReview) return;
+    const amountValid = vm.validateField('annualBaseSalary', form.annualBaseSalary);
+    const dateValid = vm.validateField('effectiveDate', form.effectiveDate);
+    if (!amountValid || !dateValid) { form.$setSubmitted(); return; }
     if (form.$invalid || !vm.draft.reason.trim()) { form.$setSubmitted(); vm.fail({ message: 'Enter an annual salary, a valid effective date, and a reason.', fieldErrors: [] }); return; }
     vm.operation = { key: crypto.randomUUID(), body: Object.freeze(buildSalaryPayload(vm.draft, vm.employee)) }; vm.attempts = 0;
     submit();
@@ -246,7 +270,13 @@ function SalaryController(api, $routeParams, $location, $scope, $timeout) {
     } catch (error) { if (serial === historyRequest) vm.historyError = error; }
     finally { if (serial === historyRequest) vm.historyLoading = false; vm.paint(); }
   };
-  vm.acceptReview = () => { if (vm.uncertain) return; vm.employee = vm.latest; vm.latest = null; vm.error = null; vm.needsReview = false; vm.operation = null; };
+  vm.acceptReview = form => {
+    if (vm.uncertain) return;
+    vm.employee = vm.latest; vm.latest = null; vm.error = null; vm.needsReview = false; vm.operation = null;
+    for (const field of ['annualBaseSalary', 'effectiveDate']) {
+      if (form[field].$touched) vm.validateField(field, form[field]);
+    }
+  };
   vm.$onInit = vm.load;
 }
 

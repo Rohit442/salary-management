@@ -63,7 +63,7 @@ const shellTemplate = `
 <div ng-class="{'workspace': $ctrl.api.user}">
   <div class="sidebar-scrim" ng-if="$ctrl.api.user && $ctrl.menuOpen" ng-click="$ctrl.closeMenu()" aria-hidden="true"></div>
   <aside class="sidebar" ng-if="$ctrl.api.user" ng-class="{'open': $ctrl.menuOpen}" aria-label="Workspace navigation">
-    ${brand}<div class="eyebrow">People operations</div><div class="organization">ACME Organization<small>Salary management</small></div>
+    <a class="brand" href="#!/employees"><span class="brand-mark" aria-hidden="true">A</span><span>ACME</span></a><div class="eyebrow">People operations</div><div class="organization">ACME Organization<small>Salary management</small></div>
     <nav class="nav-links"><a class="nav-link" href="#!/employees" ng-class="{'active': !$ctrl.isReports()}" ng-attr-aria-current="{{!$ctrl.isReports() ? 'page' : undefined}}">${people}Employees</a><a class="nav-link" href="#!/reports" ng-class="{'active': $ctrl.isReports()}" ng-attr-aria-current="{{$ctrl.isReports() ? 'page' : undefined}}">${chart}Reports</a></nav>
     <div class="sidebar-user"><strong>{{$ctrl.api.user.displayName}}</strong><small>HR Manager</small><button class="signout" ng-click="$ctrl.logout()" ng-disabled="$ctrl.signingOut">{{$ctrl.signingOut ? 'Signing out…' : 'Sign out'}}</button></div>
   </aside>

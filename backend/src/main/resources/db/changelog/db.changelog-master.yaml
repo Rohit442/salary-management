@@ -41,3 +41,13 @@ databaseChangeLog:
             param:
               - name: employeeCount
                 value: ${employeeCount}
+  - include:
+      file: db/changelog/005-create-er-reference-tables.sql
+  - include:
+      file: db/changelog/006-seed-er-reference-data.yaml
+  - include:
+      file: db/changelog/007-complete-employee-schema.sql
+  - include:
+      file: db/changelog/008-create-salary-change.sql
+  - include:
+      file: db/changelog/009-retire-sample-message.sql

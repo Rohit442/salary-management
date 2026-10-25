@@ -77,6 +77,7 @@ Keep the current salary on the employee record. A separate current-salary table 
 
 ```mermaid
 erDiagram
+    HR_USER ||--o{ EMPLOYEE : creates
     CURRENCY ||--o{ EMPLOYEE : denominates
     EMPLOYEE ||--o{ SALARY_CHANGE : has
     HR_USER ||--o{ SALARY_CHANGE : performs

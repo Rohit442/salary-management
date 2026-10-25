@@ -2,7 +2,7 @@
 
 ## Project status
 
-Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend now includes persistent H2, Liquibase schema creation and first-run Datafaker seeding of 10,000 employees, and an authenticated `GET /api/sample` returning a database-backed greeting. Salary-management APIs, salary-history/authentication tables, named HR authentication, CI, and deployment are pending. The current Playwright starter verifies browser setup.
+Requirements, API contracts, technical design, eight Figma screens, and the backend bootstrap are available. The backend includes persistent H2, the four ER tables (`HR_USER`, `CURRENCY`, `EMPLOYEE`, `SALARY_CHANGE`), Liquibase migrations, first-run Datafaker seeding of 10,000 employees, and the authenticated local H2 console. Salary-management APIs, database-backed HR sign-in/provisioning, CI, and deployment are pending. The current Playwright starter verifies browser setup.
 
 Feature exclusions are defined in [Out of scope](docs/requirements.md#out-of-scope).
 
@@ -24,15 +24,9 @@ JDK instructions: [IntelliJ IDEA SDK setup](https://www.jetbrains.com/help/idea/
 
 No database installation is needed. The default H2 file lives at `~/.acme-salary-management/salary-management.mv.db` and survives backend restarts. Optional `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` override the defaults. Remove old Oracle overrides before running.
 
-Liquibase creates `sample_message` and `employee`, seeds `hello Rohit`, and generates 10,000 fictional employees on first run. Applied changesets prevent reseeding on later runs. Tests use separate databases with a 20-employee fixture; the restart integration test verifies the full 10,000-record dataset. Hibernate validates the schema.
+Liquibase creates the ER schema, seeds five currencies and a disabled employee-seed audit identity, and populates `EMPLOYEE` with 10,000 fictional employees. Employee creation actors and currencies are linked by foreign keys. `SALARY_CHANGE` starts empty: initial salaries are stored in employee baseline fields.
 
-After startup, read the sample using the generated development password from the console (curl prompts for it):
-
-```sh
-curl --user user --header 'Accept: application/json' http://localhost:8080/api/sample
-```
-
-Response: `{"id":1,"message":"hello Rohit"}`. See [H2 setup](docs/database-h2.md) for persistence and migration details.
+Existing databases are upgraded in place without rerunning the employee seed or overwriting employee edits. The hello-world table and `/api/sample` endpoint have been retired. Tests use separate databases with a 20-employee fixture; the upgrade/restart test preserves the full 10,000-record dataset. See [H2 schema and migration details](docs/database-h2.md).
 
 To browse tables while the backend runs, open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). Sign in with `user` and the generated startup password, then connect using the default H2 JDBC URL, username `sa`, and an empty database password. [Console connection details](docs/database-h2.md#browser-console). Set `H2_CONSOLE_ENABLED=false` outside local development.
 

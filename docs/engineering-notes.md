@@ -80,3 +80,12 @@ Add observed implementation results and significant decision changes to this log
 - Scope same-origin framing and the CSRF exception to the console security chain. Retain authenticated API access, default API frame denial, and API CSRF protection in the fallback chain. Apply this configuration only in servlet applications with the console enabled.
 - Observed the console HTTP test fail on `X-Frame-Options: DENY` before the security change.
 - Maven `verify` passed: eight tests, zero failures/errors. Real HTTP tests verified the sign-in redirect, authenticated console frames, H2 database login and an employee-count SQL query. API authentication, CSRF rejection, and frame denial remain covered; sample and 10,000-employee persistence tests also pass.
+
+## ER schema and employee seed upgrade — 25 October 2026
+
+- Implement `HR_USER`, `CURRENCY`, `EMPLOYEE`, and `SALARY_CHANGE` from the saved ER model. Add the missing HR-user-to-created-employee relationship to the diagram. Use new Liquibase SQL DDL/change files instead of rewriting already-applied migrations or the original employee generator.
+- Upgrade the existing employee table in place: widen API fields, add creation-actor snapshots/foreign keys and currency relationships, and backfill provenance from a disabled seed identity. Generate an unknown password and store only its BCrypt hash; provisioning actual HR login accounts remains separate.
+- Seed five supported currencies and preserve all existing Datafaker employees. Start salary history empty because initial amounts belong in the employee baseline. History schema includes actor/retry uniqueness, version/effective-date uniqueness, currency consistency, and the employee/time/ID index.
+- Retire the hello-world `SAMPLE_MESSAGE` table and its `/api/sample` implementation through a new drop-table migration and removal of the sample controller/service files.
+- Observed red tests before implementation: expected ER tables were missing, and the legacy-data upgrade test failed with `Table HR_USER not found`.
+- Maven `verify` passed: ten tests, zero failures/errors. Tests cover fresh migrations, upgrade of an old 10,000-employee file database, a subsequent restart, preserved employee edits, complete creator/currency links, empty initial history, invalid foreign keys, duplicate replay keys, history currency mismatch, salary checks and API field lengths. H2 console SQL access and API security checks remain green. Database-backed business endpoints are tracked in the README.

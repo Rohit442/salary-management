@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-seed-er-reference-data
+      author: salary-management
+      changes:
+        - customChange:
+            class: com.acme.salarymanagement.seed.ReferenceDataSeedChange

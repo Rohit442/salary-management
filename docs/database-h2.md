@@ -10,21 +10,24 @@ The default JDBC URL is `jdbc:h2:file:~/.acme-salary-management/salary-managemen
 
 Optional overrides are `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; defaults are the URL above, `sa`, and an empty password. Keep local database files outside source control.
 
-Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yaml`. Its changesets create `sample_message` with `hello Rohit`, create `employee`, and invoke `EmployeeSeedChange` to generate and insert 10,000 fictional employees using Datafaker 2.7.0. Liquibase executes the generated insert statements within the seed changeset transaction and manages its connection. Applied changesets are recorded in `DATABASECHANGELOG`; restarting neither duplicates the seed nor overwrites edited rows. Add new changesets for later changes rather than editing applied ones.
+## ER tables and migrations
 
-Spring Security currently supplies development authentication: username `user` and the generated password printed at startup. Use that password when prompted by curl:
+Liquibase reads `backend/src/main/resources/db/changelog/db.changelog-master.yaml`. The resulting application tables match the [ER diagram](technical-design.md#3-data-model):
 
-```sh
-curl --user user --header 'Accept: application/json' http://localhost:8080/api/sample
-```
+| Table | Seed and purpose |
+|---|---|
+| `HR_USER` | One disabled `seed@acme.example` provenance identity named `Demo Data Seed`; stores a randomly generated, BCrypt-hashed unknown password. It is not the Spring development login. |
+| `CURRENCY` | `INR`, `USD`, `GBP`, `EUR`, `SGD`, each with two fraction digits |
+| `EMPLOYEE` | 10,000 Datafaker records with current salary, immutable initial salary baseline, employment dates, version/timestamps, currency and creation-actor links |
+| `SALARY_CHANGE` | Initially empty; holds subsequent changes, actor snapshots, effective dates, resulting versions and retry metadata |
 
-Expected HTTP 200 body:
+Migrations `005`–`009` add reference tables/data, complete the existing employee table, create salary history, and remove `SAMPLE_MESSAGE`. Applied migrations `001`–`004` are unchanged for compatibility. The original employee seed remains a recorded, one-time Liquibase change; the later schema migration attaches its rows to the currency and provenance records. No employees are copied into another table or regenerated during upgrade.
 
-```json
-{"id":1,"message":"hello Rohit"}
-```
+The employee table enforces unique normalized email/employee IDs, positive amounts, valid date ordering, and creator/currency foreign keys. Field sizes match the employee contract, including 200-character names and job titles. Salary history enforces actor and employee/currency relationships, positive changed amounts, unique actor/retry keys, and unique employee effective dates/resulting versions. Its history index supports employee/time/ID ordering. Foreign keys preserve referenced records rather than cascading deletion.
 
-This endpoint reads the row through the SQL utility, using Spring JDBC to acquire and release pooled connections. The named HR session endpoints remain part of the application implementation plan.
+Liquibase owns connection and transaction handling for generated insert statements and tracks completed changes in `DATABASECHANGELOG`. Restarting does not repeat the seed or overwrite saved edits. Add new changesets instead of editing applied ones.
+
+Spring Security's current development login remains username `user` with the generated startup password. The former `/api/sample` greeting endpoint was removed with its hello-world table.
 
 ## Browser console
 
@@ -54,9 +57,9 @@ The local setup enables the console by default. Set `H2_CONSOLE_ENABLED=false` o
 
 The first database migration automatically generates 10,000 employees across five countries/currencies, six departments, six job levels, and active/inactive statuses. Names come from Datafaker; IDs and fictional `@acme.example` addresses remain unique. Salary amounts use decimals, with joining/end dates and initial salary baselines. Fixed random seeds and a fixed reference date make the dataset reproducible with the pinned library version.
 
-`spring.liquibase.parameters.employeeCount` defaults to `10000`; the test profile uses `20`. Keep this changeset parameter unchanged for an existing database. The file-persistence test explicitly uses 10,000 employees, edits a row, restarts, and verifies that the edit and row count survive without another seed execution.
+`spring.liquibase.parameters.employeeCount` defaults to `10000`; the test profile uses `20`. Keep this changeset parameter unchanged for an existing database. The file-persistence test explicitly creates the old 10,000-employee database, edits a row, upgrades to the ER schema, and restarts again. It verifies that the edit and row count survive with valid creator/currency links and no repeated seed execution.
 
-Existing databases containing the earlier sample changesets receive only the new employee schema/seed on their next run. The sample API remains `GET /api/sample`; employee endpoints are tracked in the README.
+Existing databases receive the new ER migrations on their next backend startup. Employee API implementation status is tracked in the README.
 
 The employee schema uses `DECIMAL(19,4)`; generated salary amounts use `BigDecimal`. Validate constraints, reports, transactions, and retry behavior against H2 using the same Liquibase migrations.
 

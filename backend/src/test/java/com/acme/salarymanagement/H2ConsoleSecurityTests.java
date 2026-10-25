@@ -57,13 +57,13 @@ class H2ConsoleSecurityTests {
 
     @Test
     void apiStillRequiresAuthenticationAndCsrf() throws Exception {
-        var anonymous = client.send(request("/api/sample", false).header("Accept", "application/json")
+        var anonymous = client.send(request("/api/employees", false).header("Accept", "application/json")
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(anonymous.statusCode()).isEqualTo(401);
-        var authenticated = client.send(request("/api/sample", true).GET().build(), HttpResponse.BodyHandlers.ofString());
-        assertThat(authenticated.statusCode()).isEqualTo(200);
+        var authenticated = client.send(request("/api/employees", true).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(authenticated.statusCode()).isEqualTo(404);
         assertThat(authenticated.headers().firstValue("X-Frame-Options")).contains("DENY");
-        var unsafe = client.send(request("/api/sample", true).POST(HttpRequest.BodyPublishers.noBody()).build(),
+        var unsafe = client.send(request("/api/employees", true).POST(HttpRequest.BodyPublishers.noBody()).build(),
                 HttpResponse.BodyHandlers.ofString());
         // A protected /error redispatch can return 401 after the CSRF rejection.
         assertThat(unsafe.statusCode()).isIn(401, 403);

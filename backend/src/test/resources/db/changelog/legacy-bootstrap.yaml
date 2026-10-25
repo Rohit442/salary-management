@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      logicalFilePath: db/changelog/db.changelog-master.yaml
+      id: 001-create-sample-message
+      author: salary-management
+      changes:
+        - createTable:
+            tableName: sample_message
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: message
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+  - changeSet:
+      logicalFilePath: db/changelog/db.changelog-master.yaml
+      id: 002-seed-sample-message
+      author: salary-management
+      changes:
+        - insert:
+            tableName: sample_message
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: message
+                  value: hello Rohit
+  - include:
+      file: db/changelog/003-create-employees.yaml
+  - changeSet:
+      logicalFilePath: db/changelog/db.changelog-master.yaml
+      id: 004-seed-demo-employees
+      author: salary-management
+      changes:
+        - customChange:
+            class: com.acme.salarymanagement.seed.EmployeeSeedChange
+            param:
+              - name: employeeCount
+                value: ${employeeCount}

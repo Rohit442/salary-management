@@ -26,6 +26,28 @@ Expected HTTP 200 body:
 
 This endpoint reads the row through the SQL utility, using Spring JDBC to acquire and release pooled connections. The named HR session endpoints remain part of the application implementation plan.
 
+## Browser console
+
+Restart the backend, then open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). First sign in with Spring's development username `user` and the generated startup password. On the H2 connection form enter:
+
+| Field | Value |
+|---|---|
+| Driver Class | `org.h2.Driver` |
+| JDBC URL | `jdbc:h2:file:~/.acme-salary-management/salary-management;DB_CLOSE_ON_EXIT=FALSE` |
+| User Name | `sa` |
+| Password | Empty |
+
+Use your configured datasource values if you override the defaults. Click **Connect**, then run:
+
+```sql
+SELECT COUNT(*) FROM employee;
+SELECT * FROM employee FETCH FIRST 20 ROWS ONLY;
+```
+
+The console shares the backend's database process, so the backend stays running while you query. It requires Spring authentication and rejects remote console clients. Console-only security settings allow same-origin frames and exempt its forms from CSRF; API routes retain authentication, CSRF protection, and denied framing.
+
+The local setup enables the console by default. Set `H2_CONSOLE_ENABLED=false` outside local development to disable the console and its custom security configuration.
+
 ## Tests and larger datasets
 
 `./mvnw verify` runs tests against a separate in-memory H2 database and temporary file databases. The restart test closes and reopens an application context, verifies saved data survives, and checks the seed has not run twice.

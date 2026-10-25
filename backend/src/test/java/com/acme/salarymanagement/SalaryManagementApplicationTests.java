@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -38,6 +39,12 @@ class SalaryManagementApplicationTests {
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT country_code) FROM employee", Integer.class)).isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT currency_code) FROM employee", Integer.class)).isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM employee WHERE annual_base_salary <= 0 OR initial_annual_base_salary <> annual_base_salary OR initial_salary_effective_from <> joining_date OR salary_effective_from <> joining_date", Integer.class)).isZero();
+    }
+
+    @Test
+    @WithMockUser
+    void apiRejectsWriteWithoutCsrfToken() throws Exception {
+        mvc.perform(post("/api/sample")).andExpect(status().isForbidden());
     }
 
     @Test

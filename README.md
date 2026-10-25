@@ -34,6 +34,8 @@ curl --user user --header 'Accept: application/json' http://localhost:8080/api/s
 
 Response: `{"id":1,"message":"hello Rohit"}`. See [H2 setup](docs/database-h2.md) for persistence and migration details.
 
+To browse tables while the backend runs, open [http://localhost:8080/h2-console](http://localhost:8080/h2-console). Sign in with `user` and the generated startup password, then connect using the default H2 JDBC URL, username `sa`, and an empty database password. [Console connection details](docs/database-h2.md#browser-console). Set `H2_CONSOLE_ENABLED=false` outside local development.
+
 From `backend/`, use the supplied Maven wrapper:
 
 | Command | Purpose |

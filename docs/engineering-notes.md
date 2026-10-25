@@ -73,3 +73,10 @@ Add observed implementation results and significant decision changes to this log
 - Test-first evidence: the file-restart integration test failed with H2 `Table EMPLOYEE not found` before the employee schema/seed was implemented.
 - Maven `verify` passed: four tests, zero failures/errors. The full 10,000-row file database survived application restart with an edited employee name intact and exactly one recorded employee seed execution. The small fixture verified unique identities, five country/currency groups, and positive consistent salary baselines. Existing sample/authentication checks remain green.
 - Configure Mockito as a startup Java agent for tests, avoiding dynamic self-attachment on the bundled JDK. Verification used JDK 25 with Java 21 compilation target.
+
+## Authenticated H2 console — 25 October 2026
+
+- Enable the local browser console at `/h2-console`, with remote console access disabled and an `H2_CONSOLE_ENABLED=false` switch for other environments.
+- Scope same-origin framing and the CSRF exception to the console security chain. Retain authenticated API access, default API frame denial, and API CSRF protection in the fallback chain. Apply this configuration only in servlet applications with the console enabled.
+- Observed the console HTTP test fail on `X-Frame-Options: DENY` before the security change.
+- Maven `verify` passed: eight tests, zero failures/errors. Real HTTP tests verified the sign-in redirect, authenticated console frames, H2 database login and an employee-count SQL query. API authentication, CSRF rejection, and frame denial remain covered; sample and 10,000-employee persistence tests also pass.

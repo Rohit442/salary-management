@@ -35,6 +35,8 @@ export type CapturedRequest = { path: string; method: string; query: URLSearchPa
 export type FixtureState = {
   signedIn: boolean; rejectLogin: boolean; reportMode: 'data' | 'empty' | 'failure' | 'expired';
   referenceFailure: boolean; logoutUncertain: boolean; salaryConflict: boolean; salaryUncertain: boolean; employeeReadFailure: boolean; employeeVersion: number; historyWithChange: boolean; estimateFailure: boolean; records: Record<string, typeof employee>; requests: CapturedRequest[];
+  directoryRecords?: Array<typeof employee>; suggestionsFailure: boolean;
+  suggestionResponseGate?: (prefix: string) => Promise<void>;
 };
 function failure(code: string, message: string) {
   return { code, message, requestId: '00000000-0000-4000-8000-000000000001', fieldErrors: [] };
@@ -46,8 +48,9 @@ async function json(route: Route, status: number, body?: unknown) {
 export async function fixtureApi(page: Page, initial: Partial<FixtureState> = {}) {
   const state: FixtureState = {
     signedIn: true, rejectLogin: false, reportMode: 'data', referenceFailure: false, logoutUncertain: false, salaryConflict: false, salaryUncertain: false, employeeReadFailure: false, employeeVersion: 3, historyWithChange: false, estimateFailure: false, records: { [employee.employeeId]: { ...employee } },
-    requests: [], ...initial,
+    requests: [], suggestionsFailure: false, ...initial,
   };
+  for (const record of state.directoryRecords || []) state.records[record.employeeId] = { ...record };
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -91,13 +94,35 @@ export async function fixtureApi(page: Page, initial: Partial<FixtureState> = {}
         })), generatedAt: '2026-10-25T06:00:00Z',
       });
     }
+    if (path === '/api/employees/suggestions' && method === 'GET') {
+      const prefix = url.searchParams.get('prefix') || '';
+      await state.suggestionResponseGate?.(prefix);
+      if (state.suggestionsFailure) return json(route, 503, failure('SERVICE_UNAVAILABLE', 'Suggestions are temporarily unavailable.'));
+      const limit = Number(url.searchParams.get('limit') || 8);
+      const candidates = state.directoryRecords || Object.values(state.records);
+      return json(route, 200, candidates.filter(record => prefix && record.fullName.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase()))
+        .sort((left, right) => left.fullName.localeCompare(right.fullName) || left.employeeId.localeCompare(right.employeeId))
+        .slice(0, limit).map(({ employeeId, fullName }) => ({ employeeId, fullName })));
+    }
     if (path === '/api/employees' && method === 'GET') {
       const pageNumber = Number(url.searchParams.get('page') || 0);
       const size = Number(url.searchParams.get('size') || 25);
+      if (state.directoryRecords) {
+        const q = (url.searchParams.get('q') || '').toLocaleLowerCase();
+        const [field, direction] = (url.searchParams.get('sort') || 'fullName,asc').split(',');
+        const filterFields = { country: 'countryCode', department: 'department', jobLevel: 'jobLevel', currency: 'currency' } as const;
+        const matching = state.directoryRecords.filter(record => (!q || record.fullName.toLocaleLowerCase().includes(q) || record.employeeId.toLocaleLowerCase().includes(q)) &&
+          Object.entries(filterFields).every(([key, property]) => !url.searchParams.getAll(key).length || url.searchParams.getAll(key).includes(record[property])))
+          .sort((left, right) => (String(left[field as keyof typeof employee]).localeCompare(String(right[field as keyof typeof employee])) || left.employeeId.localeCompare(right.employeeId)) * (direction === 'desc' ? -1 : 1));
+        const items = matching.slice(pageNumber * size, (pageNumber + 1) * size);
+        const totalPages = Math.ceil(matching.length / size);
+        return json(route, 200, { items, page: pageNumber, size, numberOfElements: items.length, totalElements: matching.length,
+          totalPages, sort: { field, direction }, hasPrevious: pageNumber > 0, hasNext: pageNumber + 1 < totalPages });
+      }
       const noMatches = url.searchParams.get('q') === 'No matching employee';
       const items = noMatches ? [] : [{ ...employee, ...(pageNumber > 0 ? { employeeId: 'EMP-004219', fullName: 'Sam Rivera', workEmail: 'sam.rivera@acme.example' } : {}) }];
       return json(route, 200, { items, page: pageNumber, size, numberOfElements: items.length,
-        totalElements: noMatches ? 0 : 26, totalPages: noMatches ? 0 : 2,
+        totalElements: noMatches ? 0 : 101, totalPages: noMatches ? 0 : Math.ceil(101 / size),
         sort: { field: 'fullName', direction: 'asc' }, hasPrevious: pageNumber > 0, hasNext: !noMatches && pageNumber === 0 });
     }
     if (path === '/api/employees' && method === 'POST') {

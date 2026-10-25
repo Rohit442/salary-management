@@ -1,14 +1,30 @@
 flowchart LR
+    %% Directory revision: Figma preview updated; final verification and implementation pending.
     entry([HR Manager]) --> login[Sign in]
     login --> access{Authorized HR user?}
     access -->|"No"| denied[Show access error]
     denied --> login
-    access -->|"Yes"| directory[Employee directory]
-    directory -->|"Search or filter"| results{Employees found?}
-    results -->|"Yes"| matches[Paginated employee results]
+    access -->|"Yes"| directory["Employee directory<br/>Existing substring search unchanged"]
+    directory -->|"Table search: blur or Enter"| reset[Reset to page 1]
+    directory -->|"At least 1 character; pause 300 ms"| suggestions["Names-only prefix suggestions<br/>Table results unchanged"]
+    suggestions -->|"Select name or highlighted result with Enter"| profile[Employee details]
+    suggestions -->|"Escape, outside click or empty input"| directory
+    suggestions -->|"Failure: keep table available"| directory
+    directory -->|"Changed filter: focus leaves control and popup"| reset
+    directory -->|"Explicit sort change"| reset
+    directory -->|"Clear filters beside dropdowns: immediate"| clear["Clear search and filters<br/>Keep sort"]
+    clear --> reset
+    reset --> results{Employees found?}
+    results -->|"Yes"| matches["Paginated employee results<br/>Fixed 100 rows per page"]
     results -->|"No"| empty[No matching employees]
-    empty -->|"Clear filters"| directory
-    matches -->|"Select employee"| profile[Employee details]
+    empty -->|"Clear filters"| clear
+    matches -->|"Previous or Next"| jump[Load requested page]
+    matches -->|"Valid page number; Go or Enter"| jump
+    jump --> results
+    matches -->|"Select employee"| profile
+    profile -->|"Directory link or browser Back"| restore["Restore search text, applied query and filters,<br/>sort, page and scroll"]
+    restore --> refresh["Refresh records<br/>Clamp page to available results"]
+    refresh --> results
     profile -->|"View history"| history[Salary change history]
     profile -->|"Update salary"| salary[Salary update form]
     directory -->|"Add employee"| create[New employee form]

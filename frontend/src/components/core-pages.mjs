@@ -12,8 +12,8 @@ const categories = [
   { key: 'currency', label: 'Currency', source: 'currencies', empty: 'All currencies' },
 ];
 const emptyFilters = () => ({ country: [], department: [], jobLevel: [], currency: [] });
-const filtersMarkup = categories.map(({ key, label, source, empty }) => `
-  <md-input-container><label>${label}</label><md-select ng-model="$ctrl.filters.${key}" multiple aria-label="${label}" placeholder="${empty}" ng-disabled="!$ctrl.refs">
+const filterControls = (automatic = false) => categories.map(({ key, label, source, empty }) => `
+  <md-input-container><label>${label}</label><md-select ng-model="$ctrl.filters.${key}" multiple aria-label="${label}" placeholder="${empty}" ng-disabled="!$ctrl.refs" ${automatic ? `id="directory-filter-${key}" ng-blur="$ctrl.filterBlur('${key}')" md-on-open="$ctrl.openFilter = '${key}'" md-on-close="$ctrl.filterClosed('${key}')"` : ''}>
     <md-option ng-repeat="option in $ctrl.refs.${source}" ng-value="option.code || option.value">{{option.label}}</md-option>
   </md-select></md-input-container>`).join('');
 
@@ -114,34 +114,135 @@ function initReferences(vm, api) {
   vm.label = (kind, value) => (vm.refs?.[kind] || []).find(item => (item.code || item.value) === value)?.label || value;
 }
 
-function DirectoryController(api, $scope) {
+function DirectoryController(api, $scope, $timeout, $location, directoryState) {
   const vm = this; const alive = paintable(vm, $scope); let sequence = 0;
-  vm.filters = emptyFilters(); vm.page = 0; vm.size = 25; vm.sort = 'fullName,asc'; vm.q = '';
+  const copyFilters = filters => Object.fromEntries(categories.map(({ key }) => [key, [...filters[key]]]));
+  const saved = directoryState.owner === api.user ? directoryState.value : null;
+  vm.filters = copyFilters(saved?.filters || emptyFilters());
+  vm.appliedFilters = copyFilters(saved?.appliedFilters || emptyFilters());
+  vm.page = saved?.page || 0; vm.size = 100; vm.sort = saved?.sort || 'fullName,asc';
+  vm.q = saved?.q || ''; vm.appliedQ = saved?.appliedQ || ''; vm.pageInput = String(vm.page + 1);
+  vm.suggestions = []; vm.activeSuggestion = -1;
+  let suggestionSequence = 0; let suggestionTimer; let restoreScroll = saved?.scroll;
+  const pendingBlur = new Map();
   initReferences(vm, api);
   vm.load = async () => {
     const current = ++sequence; vm.loading = true; vm.error = null; vm.result = null;
-    const query = { ...vm.filters, page: vm.page, size: vm.size, sort: vm.sort };
-    if (vm.q.trim()) query.q = vm.q.trim();
-    try { const result = await api.get('/employees', query); if (alive() && current === sequence) vm.result = result; }
+    const query = { ...vm.appliedFilters, page: vm.page, size: vm.size, sort: vm.sort };
+    if (vm.appliedQ) query.q = vm.appliedQ;
+    try {
+      const result = await api.get('/employees', query);
+      if (!alive() || current !== sequence) return;
+      const lastPage = Math.max(0, result.totalPages - 1);
+      if (vm.page > lastPage) { vm.page = lastPage; return vm.load(); }
+      vm.result = result; vm.pageInput = String(vm.page + 1);
+      if (restoreScroll !== undefined) {
+        const scroll = restoreScroll; restoreScroll = undefined;
+        $timeout(() => requestAnimationFrame(() => {
+          if (alive() && current === sequence) window.scrollTo(0, scroll);
+        }));
+      }
+    }
     catch (error) { if (alive() && current === sequence) vm.error = error; }
     finally { if (current === sequence) { vm.loading = false; vm.paint(); } }
   };
-  vm.apply = () => { vm.page = 0; vm.load(); };
-  vm.clear = () => { vm.filters = emptyFilters(); vm.q = ''; vm.apply(); };
-  vm.next = delta => { vm.page = Math.max(0, vm.page + delta); vm.load(); };
+  vm.apply = () => { vm.page = 0; vm.pageError = null; vm.load(); };
+  vm.closeSuggestions = () => {
+    ++suggestionSequence; $timeout.cancel(suggestionTimer);
+    vm.suggestions = []; vm.activeSuggestion = -1;
+  };
+  vm.searchChanged = () => {
+    vm.closeSuggestions();
+    const prefix = vm.q.trim();
+    if (!prefix) return;
+    const current = suggestionSequence;
+    suggestionTimer = $timeout(async () => {
+      try {
+        const suggestions = await api.get('/employees/suggestions', { prefix, limit: 8 });
+        if (alive() && current === suggestionSequence) vm.suggestions = suggestions;
+      } catch {
+        // Lookup failures leave the existing table and its search available.
+        if (alive() && current === suggestionSequence) vm.suggestions = [];
+      } finally { vm.paint(); }
+    }, 300);
+  };
+  vm.applySearch = () => {
+    vm.closeSuggestions();
+    if (vm.q.trim() === vm.appliedQ) return;
+    vm.appliedQ = vm.q.trim(); vm.apply();
+  };
+  vm.searchBlur = event => {
+    if (event.relatedTarget?.closest('#employee-suggestions')) return;
+    if (event.relatedTarget?.closest('[data-clear-filters]')) { vm.closeSuggestions(); return; }
+    vm.applySearch();
+  };
+  vm.chooseSuggestion = employee => {
+    vm.closeSuggestions();
+    $location.path(`/employees/${employee.employeeId}`);
+  };
+  vm.searchKey = event => {
+    if (event.key === 'Escape') { event.preventDefault(); vm.closeSuggestions(); }
+    else if (['ArrowDown', 'ArrowUp'].includes(event.key) && vm.suggestions.length) {
+      event.preventDefault();
+      const count = vm.suggestions.length;
+      vm.activeSuggestion = event.key === 'ArrowDown'
+        ? (vm.activeSuggestion + 1) % count
+        : (vm.activeSuggestion <= 0 ? count - 1 : vm.activeSuggestion - 1);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (vm.activeSuggestion >= 0) vm.chooseSuggestion(vm.suggestions[vm.activeSuggestion]);
+      else vm.applySearch();
+    }
+  };
+  vm.filterBlur = key => {
+    $timeout.cancel(pendingBlur.get(key));
+    pendingBlur.set(key, $timeout(() => {
+      const control = document.getElementById(`directory-filter-${key}`);
+      // Material moves its popup under body and restores focus after closing it.
+      if (!alive() || vm.openFilter === key || control?.contains(document.activeElement)) return;
+      if (document.activeElement?.closest('[data-clear-filters]')) return;
+      const values = [...vm.filters[key]].sort();
+      if (JSON.stringify(values) === JSON.stringify([...vm.appliedFilters[key]].sort())) return;
+      vm.appliedFilters[key] = values; vm.apply();
+    }));
+  };
+  vm.filterClosed = key => { vm.openFilter = null; vm.filterBlur(key); };
+  vm.clear = () => {
+    vm.closeSuggestions(); vm.filters = emptyFilters(); vm.appliedFilters = emptyFilters();
+    vm.q = ''; vm.appliedQ = ''; vm.apply();
+  };
+  vm.next = delta => { vm.page += delta; vm.pageError = null; vm.load(); };
+  vm.goToPage = () => {
+    const value = String(vm.pageInput).trim(); const page = Number(value);
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(page) || page < 1 || page > vm.result.totalPages) {
+      vm.pageError = `Enter a whole page number from 1 to ${vm.result.totalPages}.`; return;
+    }
+    vm.pageError = null;
+    if (page - 1 !== vm.page) { vm.page = page - 1; vm.load(); }
+  };
   vm.sortBy = field => { vm.sort = `${field},${vm.sort === `${field},asc` ? 'desc' : 'asc'}`; vm.apply(); };
+  $scope.$on('$routeChangeStart', () => {
+    directoryState.owner = api.user;
+    directoryState.value = api.user ? {
+      q: vm.q, appliedQ: vm.appliedQ, filters: copyFilters(vm.filters), appliedFilters: copyFilters(vm.appliedFilters),
+      sort: vm.sort, page: vm.page, scroll: window.scrollY,
+    } : null;
+  });
+  vm.$onDestroy = () => {
+    vm.closeSuggestions(); pendingBlur.forEach(timer => $timeout.cancel(timer));
+  };
   vm.$onInit = () => { vm.loadReferences(); vm.load(); };
 }
-DirectoryController.$inject = ['api', '$scope'];
+DirectoryController.$inject = ['api', '$scope', '$timeout', '$location', 'directoryState'];
 const directoryTemplate = `
 <section><div class="page-header"><div><h1>Employee directory</h1><p>Find people, maintain salary records, and keep your organization up to date.</p></div><a class="btn btn-primary" href="#!/employees/new"><span aria-hidden="true">+</span> Add employee</a></div>
   ${referenceError}
-  <form class="card filter-card" ng-submit="$ctrl.apply()"><div class="search-row"><div class="search-box"><label class="sr-only" for="employee-search">Search by name or employee ID</label><input id="employee-search" class="search-input" type="search" ng-model="$ctrl.q" placeholder="Search by name or employee ID" maxlength="100"></div><small ng-if="$ctrl.result">{{$ctrl.result.totalElements | number}} employees · All statuses</small></div><div class="filter-grid">${filtersMarkup}<button class="btn btn-secondary" type="submit">Apply filters</button></div><div class="filter-secondary"><span class="muted">Search by name or employee ID. Filters can include multiple values.</span><button class="btn btn-secondary btn-small" type="button" ng-click="$ctrl.clear()">Clear filters</button></div></form>
+  <div class="card filter-card"><div class="search-row"><div class="search-box"><label class="sr-only" for="employee-search">Search by name or employee ID</label><input id="employee-search" class="search-input" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-controls="employee-suggestions" ng-attr-aria-expanded="{{$ctrl.suggestions.length > 0}}" ng-attr-aria-activedescendant="{{$ctrl.activeSuggestion >= 0 ? 'employee-suggestion-' + $ctrl.activeSuggestion : undefined}}" ng-model="$ctrl.q" ng-change="$ctrl.searchChanged()" ng-blur="$ctrl.searchBlur($event)" ng-keydown="$ctrl.searchKey($event)" placeholder="Search by name or employee ID" maxlength="100"><div id="employee-suggestions" class="employee-suggestions" role="listbox" aria-label="Employee suggestions" ng-if="$ctrl.suggestions.length"><button type="button" role="option" tabindex="-1" ng-repeat="employee in $ctrl.suggestions track by employee.employeeId" id="employee-suggestion-{{$index}}" ng-attr-aria-selected="{{$index === $ctrl.activeSuggestion}}" ng-mousedown="$event.preventDefault()" ng-click="$ctrl.chooseSuggestion(employee)">{{employee.fullName}}</button></div></div><small ng-if="$ctrl.result">{{$ctrl.result.totalElements | number}} employees · All statuses</small></div><div class="filter-grid">${filterControls(true)}<button class="btn btn-secondary" type="button" data-clear-filters ng-click="$ctrl.clear()">Clear filters</button></div></div>
   ${loading}${requestError}
   <div ng-if="$ctrl.result && !$ctrl.loading">
     <div class="card empty-state" ng-if="!$ctrl.result.items.length"><h2>No matching employees</h2><p>Try a different search or clear your filters.</p><button class="btn btn-secondary" ng-click="$ctrl.clear()">Clear filters</button></div>
-    <div class="table-wrap" ng-if="$ctrl.result.items.length"><table class="data-table"><thead><tr><th><button class="table-sort" ng-click="$ctrl.sortBy('fullName')">Employee</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('countryCode')">Country</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('department')">Department</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('jobLevel')">Level</button></th><th class="number">Annual base salary</th><th>Status</th><th><span class="sr-only">Open employee</span></th></tr></thead><tbody><tr ng-repeat="employee in $ctrl.result.items track by employee.employeeId"><td><a class="employee-link" ng-href="#!/employees/{{employee.employeeId}}">{{employee.fullName}}</a><small>{{employee.employeeId}}</small></td><td>{{$ctrl.label('countries', employee.countryCode)}}</td><td>{{$ctrl.label('departments', employee.department)}}</td><td>{{employee.jobLevel}}</td><td class="number">{{employee.annualBaseSalary | formatMoney:employee.currency}}</td><td><span class="badge" ng-class="{'badge-inactive': employee.employmentStatus === 'INACTIVE'}">{{employee.employmentStatus === 'ACTIVE' ? 'Active' : 'Inactive'}}</span></td><td><a ng-href="#!/employees/{{employee.employeeId}}" aria-label="View details for {{employee.fullName}}">View details →</a></td></tr></tbody></table></div>
-    <div class="pagination"><span ng-if="$ctrl.result.items.length">Showing {{$ctrl.result.page * $ctrl.result.size + 1 | number}}–{{$ctrl.result.page * $ctrl.result.size + $ctrl.result.items.length | number}} of {{$ctrl.result.totalElements | number}} employees</span><span ng-if="!$ctrl.result.items.length">{{$ctrl.result.totalElements | number}} matching employees</span><div class="actions"><button class="btn btn-small" ng-click="$ctrl.next(-1)" ng-disabled="!$ctrl.result.hasPrevious">Previous</button><span class="page-number">{{$ctrl.page + 1}}</span><span>of {{$ctrl.result.totalPages || 1}}</span><button class="btn btn-small" ng-click="$ctrl.next(1)" ng-disabled="!$ctrl.result.hasNext">Next</button></div></div>
+    <div class="table-wrap" ng-if="$ctrl.result.items.length"><table class="data-table"><thead><tr><th><button class="table-sort" ng-click="$ctrl.sortBy('fullName')">Employee</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('countryCode')">Country</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('department')">Department</button></th><th><button class="table-sort" ng-click="$ctrl.sortBy('jobLevel')">Level</button></th><th class="number">Annual base salary</th><th>Status</th><th><span class="sr-only">Open employee</span></th></tr></thead><tbody><tr ng-repeat="employee in $ctrl.result.items track by employee.employeeId"><td><a class="employee-link" ng-href="#!/employees/{{employee.employeeId}}" ng-mousedown="$event.button === 0 && $event.preventDefault()">{{employee.fullName}}</a><small>{{employee.employeeId}}</small></td><td>{{$ctrl.label('countries', employee.countryCode)}}</td><td>{{$ctrl.label('departments', employee.department)}}</td><td>{{employee.jobLevel}}</td><td class="number">{{employee.annualBaseSalary | formatMoney:employee.currency}}</td><td><span class="badge" ng-class="{'badge-inactive': employee.employmentStatus === 'INACTIVE'}">{{employee.employmentStatus === 'ACTIVE' ? 'Active' : 'Inactive'}}</span></td><td><a ng-href="#!/employees/{{employee.employeeId}}" ng-mousedown="$event.button === 0 && $event.preventDefault()" aria-label="View details for {{employee.fullName}}">View details →</a></td></tr></tbody></table></div>
+    <div class="pagination"><span ng-if="$ctrl.result.items.length">Showing {{$ctrl.result.page * $ctrl.result.size + 1 | number}}–{{$ctrl.result.page * $ctrl.result.size + $ctrl.result.items.length | number}} of {{$ctrl.result.totalElements | number}} employees · 100 per page</span><span ng-if="!$ctrl.result.items.length">{{$ctrl.result.totalElements | number}} matching employees</span><form class="actions page-jump" ng-if="$ctrl.result.items.length" ng-submit="$ctrl.goToPage()" novalidate><label for="directory-page">Page</label><input id="directory-page" type="text" inputmode="numeric" aria-label="Page number" ng-model="$ctrl.pageInput" ng-attr-aria-invalid="{{!!$ctrl.pageError}}" aria-describedby="directory-page-error"><span>of {{$ctrl.result.totalPages}}</span><button class="btn btn-small" type="submit">Go</button><button class="btn btn-small" type="button" ng-click="$ctrl.next(-1)" ng-disabled="!$ctrl.result.hasPrevious">Previous</button><button class="btn btn-small" type="button" ng-click="$ctrl.next(1)" ng-disabled="!$ctrl.result.hasNext">Next</button></form></div><p id="directory-page-error" class="field-error" role="alert" ng-if="$ctrl.pageError">{{$ctrl.pageError}}</p>
   </div><p class="help-note">All compensation amounts represent annual base salary. Currencies are not converted.</p>
 </section>`;
 
@@ -168,7 +269,7 @@ ReportsController.$inject = ['api', '$scope'];
 const reportsTemplate = `
 <section><div class="page-header"><div><h1>Compensation reports</h1><p>Explore annual base salaries across your organization.</p></div></div>
   ${referenceError}
-  <form class="card filter-card" ng-submit="$ctrl.load()"><div class="filter-grid">${filtersMarkup}<button type="submit" class="btn btn-primary" ng-disabled="!$ctrl.refs">Apply filters</button></div><div class="filter-secondary"><div class="group-select"><label id="group-label">Group by</label><md-select ng-model="$ctrl.groupBy" multiple aria-label="Group by" placeholder="Currency only" ng-disabled="!$ctrl.refs"><md-option ng-repeat="dimension in $ctrl.dimensions" ng-value="dimension.value">{{dimension.label}}</md-option></md-select></div><span class="muted">Active employees only</span><button type="button" class="btn btn-secondary btn-small" ng-click="$ctrl.clear()" ng-disabled="!$ctrl.refs">Clear filters</button></div></form>
+  <form class="card filter-card" ng-submit="$ctrl.load()"><div class="filter-grid">${filterControls()}<button type="submit" class="btn btn-primary" ng-disabled="!$ctrl.refs">Apply filters</button></div><div class="filter-secondary"><div class="group-select"><label id="group-label">Group by</label><md-select ng-model="$ctrl.groupBy" multiple aria-label="Group by" placeholder="Currency only" ng-disabled="!$ctrl.refs"><md-option ng-repeat="dimension in $ctrl.dimensions" ng-value="dimension.value">{{dimension.label}}</md-option></md-select></div><span class="muted">Active employees only</span><button type="button" class="btn btn-secondary btn-small" ng-click="$ctrl.clear()" ng-disabled="!$ctrl.refs">Clear filters</button></div></form>
   ${loading}${requestError}
   <div ng-if="$ctrl.report && !$ctrl.loading">
     <div class="card empty-state" ng-if="!$ctrl.report.totalEmployees"><h2>No matching compensation data.</h2><p>Adjust your filters to include a different group of employees.</p><button class="btn btn-secondary" ng-click="$ctrl.clear()">Clear filters</button></div>
@@ -183,6 +284,7 @@ const reportsTemplate = `
 </section>`;
 
 export function registerCorePages(app) {
+  app.value('directoryState', {});
   app.component('appShell', { controller: ShellController, template: shellTemplate });
   app.component('signIn', { controller: SignInController, template: signinTemplate });
   app.component('employeeDirectory', { controller: DirectoryController, template: directoryTemplate });

@@ -16,8 +16,8 @@ test('live sign-in, employee search/detail, currency reports, refresh and logout
   expect(directory.totalElements).toBe(20);
   const employee = directory.items[0];
   await expect(page.getByRole('link', { name: employee.fullName, exact: true })).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Search by name or employee ID' }).fill(employee.employeeId);
-  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await page.getByLabel('Search by name or employee ID', { exact: true }).fill(employee.employeeId);
+  await page.getByLabel('Search by name or employee ID', { exact: true }).press('Tab');
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByRole('link', { name: employee.fullName, exact: true }).click();
   await expect(page.getByRole('heading', { name: employee.fullName, exact: true })).toBeVisible();

@@ -1,0 +1,20 @@
+flowchart LR
+    profile([Employee details]) --> form[Update salary form]
+    form --> amount[Enter salary, effective date and reason]
+    amount --> submit[Save salary]
+    submit --> valid{Inputs valid?}
+    valid -->|"No"| errors[Show field errors]
+    errors --> amount
+    valid -->|"Yes"| saving[Show saving state]
+    saving --> saved{Save succeeded?}
+    saved -->|"No"| failure[Keep inputs and show error]
+    failure -->|"Retry"| submit
+    failure -->|"Cancel"| cancelled([Return without changes])
+    saved -->|"Yes"| updated[Show updated salary]
+    updated --> confirmation[Show success message]
+    confirmation --> history[View salary change history]
+    history --> details[Previous and new amounts, effective date, reason, actor and recorded time]
+    form -->|"Cancel"| cancelled
+    style errors fill:#FFCDC2,stroke:#FF7556
+    style failure fill:#FFCDC2,stroke:#FF7556
+    style confirmation fill:#CDF4D3,stroke:#66D575

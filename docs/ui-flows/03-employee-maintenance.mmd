@@ -1,0 +1,33 @@
+flowchart LR
+    directory([Employee directory]) --> action{Choose action}
+    action -->|"Add employee"| create[New employee and initial salary date form]
+    action -->|"Select employee"| profile[Employee details]
+    profile -->|"Edit details"| edit[Edit employee and employment dates form]
+    create --> save[Save employee]
+    edit --> save
+    save --> valid{Valid and unique?}
+    valid -->|"No"| errors[Show field errors]
+    errors --> correction[Correct employee details]
+    correction --> save
+    valid -->|"Yes"| result{Save succeeded?}
+    result -->|"Yes"| updated([Show saved employee])
+    result -->|"No"| failure[Keep inputs and show error]
+    failure -->|"Retry"| save
+    profile -->|"Monthly base pay"| month[Choose month]
+    month --> estimate{Employment and salary history available?}
+    estimate -->|"Yes"| pay[Use whole-month salary and prorate employment days]
+    estimate -->|"No employment"| zero[Show zero eligible days and zero estimate]
+    estimate -->|"Incomplete history"| gap[Show incomplete salary history]
+    pay --> profile
+    profile -->|"Mark inactive"| confirm{Confirm status change?}
+    confirm -->|"Cancel"| profile
+    confirm -->|"Confirm"| status{Status saved?}
+    status -->|"Yes"| inactive([Show inactive employee])
+    status -->|"No"| statusError[Show error and retry option]
+    statusError --> confirm
+    create -->|"Cancel"| directory
+    edit -->|"Cancel"| profile
+    style errors fill:#FFCDC2,stroke:#FF7556
+    style failure fill:#FFCDC2,stroke:#FF7556
+    style statusError fill:#FFCDC2,stroke:#FF7556
+    style updated fill:#CDF4D3,stroke:#66D575

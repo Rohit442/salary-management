@@ -1,0 +1,17 @@
+flowchart LR
+    entry([Open compensation reports]) --> filters[Choose filters and grouping]
+    filters --> loading[Load active employee metrics]
+    loading --> response{Report loaded?}
+    response -->|"No"| error[Show error and retry]
+    error --> loading
+    response -->|"Yes"| available{Matching employees?}
+    available -->|"No"| empty[Show no matching data]
+    empty -->|"Adjust filters"| filters
+    available -->|"Yes"| report[Show annual base salary metrics]
+    report --> groups[Separate totals by currency]
+    groups --> metrics[Count, total, average and median]
+    metrics -->|"Refine comparison"| filters
+    metrics --> done([Review compensation results])
+    style error fill:#FFCDC2,stroke:#FF7556
+    style empty fill:#FFECBD,stroke:#FFC943
+    style report fill:#C2E5FF,stroke:#3DADFF

@@ -1,0 +1,19 @@
+flowchart LR
+    entry([HR Manager]) --> login[Sign in]
+    login --> access{Authorized HR user?}
+    access -->|"No"| denied[Show access error]
+    denied --> login
+    access -->|"Yes"| directory[Employee directory]
+    directory -->|"Search or filter"| results{Employees found?}
+    results -->|"Yes"| matches[Paginated employee results]
+    results -->|"No"| empty[No matching employees]
+    empty -->|"Clear filters"| directory
+    matches -->|"Select employee"| profile[Employee details]
+    profile -->|"View history"| history[Salary change history]
+    profile -->|"Update salary"| salary[Salary update form]
+    directory -->|"Add employee"| create[New employee form]
+    directory -->|"Open reports"| reports[Compensation reports]
+    directory -->|"Sign out"| signedOut([Signed out])
+    style denied fill:#FFCDC2,stroke:#FF7556
+    style empty fill:#FFECBD,stroke:#FFC943
+    style directory fill:#C2E5FF,stroke:#3DADFF
